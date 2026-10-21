@@ -27,7 +27,7 @@ Native SwiftUI + AppKit app that lives in the MacBook notch and in a virtual not
 Next, after Media:
 
 10. Jira — done: Mine / Sprint / status queue (any assignee), projects auto-discovered (no hardcoded keys — the app must suit anyone), Start + any transition.
-11. Messages — done: Slack, Telegram, other messengers and mail apps, read from the macOS notification database (Full Disk Access). Unread = notification still present (apps clear it on read), up to 7 days; browser notifications mapped to web apps by site (Gmail, Telegram Web…).
+11. Messages — done: Slack, Telegram, other messengers and mail apps, read from the macOS notification database (Full Disk Access). Read = its app or its site's active browser tab was in front after the message (visits tracked every 2 s), or notification gone; up to 7 days; browser notifications mapped to web apps by site (Gmail, Telegram Web…).
 12. Integrations screen in settings for API keys/tokens (Jira, Slack, …), stored in Keychain.
 13. Quick actions next to Keep Awake: VPN on/off first.
 
@@ -39,5 +39,5 @@ Tabs are configurable in Settings (gear): all on by default; a disabled tab hide
 - Keep Awake button (`caffeinate`) — one tap, animated. Done.
 - More quick-action buttons next to Keep Awake (one-tap commands). Ideas so far: VPN on/off. More to be collected with the user.
 - Notes tab = Apple Notes (all notes, search; plain-text notes editable in Halu, rich notes read-only with "Open in Notes"; new notes go to the Notes folder).
-- Media tab: any source. Core Audio process list (public API) finds the app playing audio, its window title comes from Accessibility, control via system media keys. The tab shows only while something plays or was paused in the last 30 min. No Music/Spotify scripting for now. The perl-hosted MediaRemote helper (Cyclop's approach) was rejected as a security bypass — don't reintroduce it.
+- Media tab: any source. Core Audio process list (public API) finds the app playing audio, its window title comes from Accessibility, control via system media keys. The tab shows only while something plays or was paused in the last 30 min. Browsers (Chromium family, Safari): page player driven via AppleScript "execute javascript" (needs "Allow JavaScript from Apple Events"); never media keys there — they wake Apple Music when the video is paused. Browser tabs are scanned only while the Media tab is visible. The perl-hosted MediaRemote helper (Cyclop's approach) was rejected as a security bypass — don't reintroduce it.
 - The animated Halu mark spins only where work is in progress (Claude tab, running tasks), never constantly in the main panel.

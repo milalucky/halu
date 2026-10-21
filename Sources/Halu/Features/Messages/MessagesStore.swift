@@ -14,8 +14,8 @@ struct IncomingMessage: Identifiable, Equatable {
 }
 
 /// Unread messages from Slack, Telegram, mail and other messengers, read from the notifications macOS
-/// received for them. A message counts as unread while its notification is still in Notification Center:
-/// Slack, Mail and the rest remove it once you read the message. Web apps in a browser (Gmail, Telegram
+/// received for them. A message counts as read once you've been in its app or its site's browser tab
+/// after it arrived (web apps never clear their notifications), or once its notification is gone. Web apps in a browser (Gmail, Telegram
 /// Web, Slack in the browser) are recognised by their site. No tokens or sign-in; it takes Full Disk
 /// Access, because the notification database is protected.
 @MainActor
@@ -68,6 +68,9 @@ final class MessagesStore: ObservableObject {
     /// Older notifications are not "waiting" any more, even if never cleared.
     private let window: TimeInterval = 7 * 24 * 3600
     private var dismissed = Set(UserDefaults.standard.array(forKey: "messages.dismissed") as? [Int64] ?? [])
+    /// When each source (by name) was last in front: its app, or its site in the browser's active tab.
+    private var visits: [String: Date] = UserDefaults.standard.dictionary(forKey: "messages.visits") as? [String: Date] ?? [:]
+    private var visitTimer: Timer?
     private var timer: Timer?
     private let queue = DispatchQueue(label: "halu.messages", qos: .utility)
 
@@ -95,7 +98,45 @@ final class MessagesStore: ObservableObject {
         }
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
+        let visitTimer = Timer(timeInterval: 2, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.trackVisit() }
+        }
+        RunLoop.main.add(visitTimer, forMode: .common)
+        self.visitTimer = visitTimer
         reload()
+    }
+
+    /// Notes which source is in front right now, so its earlier messages count as read.
+    private func trackVisit() {
+        guard isActive(), let app = NSWorkspace.shared.frontmostApplication, let bundleID = app.bundleIdentifier else { return }
+        if let name = Self.messengers[bundleID] {
+            markVisited(name)
+        } else if Self.browsers.contains(bundleID) {
+            queue.async {
+                let host = Self.activeTabHost(bundleID)
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated {
+                        guard let host, let web = Self.webApps.first(where: { host.hasSuffix($0.site) }) else { return }
+                        self.markVisited(web.name)
+                    }
+                }
+            }
+        }
+    }
+
+    private func markVisited(_ name: String) {
+        visits[name] = Date()
+        UserDefaults.standard.set(visits, forKey: "messages.visits")
+        let before = messages.count
+        messages.removeAll { $0.appName == name && $0.date <= visits[name]! }
+        if messages.count != before { unseen = messages.count }
+    }
+
+    private nonisolated static func activeTabHost(_ bundleID: String) -> String? {
+        let property = bundleID == "com.apple.Safari" ? "URL of front document" : "URL of active tab of front window"
+        var error: NSDictionary?
+        let output = NSAppleScript(source: "tell application id \"\(bundleID)\" to get \(property)")?.executeAndReturnError(&error)
+        return output?.stringValue.flatMap { URL(string: $0)?.host?.lowercased() }
     }
 
     func reload() {
@@ -114,7 +155,9 @@ final class MessagesStore: ObservableObject {
                         return
                     }
                     self.access = .granted
-                    let fresh = found.filter { !self.dismissed.contains($0.id) }
+                    let fresh = found.filter { message in
+                        !self.dismissed.contains(message.id) && message.date > (self.visits[message.appName] ?? .distantPast)
+                    }
                     if fresh != self.messages { self.messages = fresh }
                     self.unseen = fresh.count
                 }
@@ -131,6 +174,8 @@ final class MessagesStore: ObservableObject {
 
     func dismissAll() {
         visible.forEach { dismissed.insert($0.id) }
+        Set(visible.map(\.appName)).forEach { visits[$0] = Date() }
+        UserDefaults.standard.set(visits, forKey: "messages.visits")
         messages.removeAll { appFilter == nil || $0.appName == appFilter }
         unseen = messages.count
         saveDismissed()

@@ -23,6 +23,16 @@ final class MediaStore: ObservableObject {
 
     @Published private(set) var source: MediaSource?
     @Published private(set) var canControl = AXIsProcessTrusted()
+    /// Rich state when the source is a browser: title, artwork, position.
+    @Published private(set) var browser: BrowserPlayback?
+    @Published private(set) var browserArtwork: NSImage?
+    /// The browser refuses JavaScript from Apple Events; the tab explains how to allow it.
+    @Published private(set) var browserScriptingOff = false
+    /// Set by the Media tab while it's on screen: browser tabs are only scanned then.
+    var isVisible = false
+
+    private let browserBridge = BrowserMedia()
+    private var artworkURL: URL?
 
     /// A paused source stays on screen this long, so it can be resumed.
     private let pausedLinger: TimeInterval = 30 * 60
@@ -40,6 +50,7 @@ final class MediaStore: ObservableObject {
     func refresh() {
         guard isActive() else { return }
         canControl = AXIsProcessTrusted()
+        defer { refreshBrowser() }
         let now = Date()
         if let playing = Self.appPlayingAudio() {
             var next = MediaSource(pid: playing.processIdentifier, appName: playing.localizedName ?? "Media",
@@ -59,6 +70,56 @@ final class MediaStore: ObservableObject {
 
     var icon: NSImage? {
         source.flatMap { NSRunningApplication(processIdentifier: $0.pid)?.icon }
+    }
+
+    var isBrowserSource: Bool { source.map { BrowserMedia.supports($0.bundleID) } ?? false }
+
+    private func refreshBrowser() {
+        guard isVisible, let source, BrowserMedia.supports(source.bundleID) else {
+            if source == nil || !(source.map { BrowserMedia.supports($0.bundleID) } ?? false) { browser = nil }
+            return
+        }
+        let hint = browser.map { (window: $0.window, tab: $0.tab) }
+        browserBridge.read(source.bundleID, hint: hint) { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .success(let playback):
+                self.browserScriptingOff = false
+                if playback != self.browser { self.browser = playback }
+                self.loadArtwork(playback?.artworkURL)
+            case .failure(let failure):
+                self.browserScriptingOff = failure == .javaScriptOff
+                self.browser = nil
+            }
+        }
+    }
+
+    private func loadArtwork(_ url: URL?) {
+        guard url != artworkURL else { return }
+        artworkURL = url
+        browserArtwork = nil
+        guard let url else { return }
+        Task {
+            guard let (data, _) = try? await URLSession.shared.data(from: url), artworkURL == url else { return }
+            browserArtwork = NSImage(data: data)
+        }
+    }
+
+    /// Browser commands go to the page's player; never through media keys, which can launch Apple Music.
+    func browserCommand(_ command: BrowserMedia.Command) {
+        guard let source, let playback = browser else { return }
+        if case .toggle = command {
+            browser?.isPlaying.toggle()
+            browser?.position = playback.position(at: .now)
+            browser?.readAt = .now
+        }
+        browserBridge.send(command, to: source.bundleID, window: playback.window, tab: playback.tab) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { self?.refreshBrowser() }
+        }
+    }
+
+    func openChromeDeveloperHelp() {
+        if let url = URL(string: "https://support.google.com/chrome/?p=applescript") { NSWorkspace.shared.open(url) }
     }
 
     func openApp() {

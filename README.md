@@ -16,13 +16,13 @@ Halu stays invisible until you point at the notch, then unfolds into a small pan
 - **Calendar.** Today's and tomorrow's meetings from any calendar on your Mac, including Google. One-click **Join** for Zoom, Google Meet, Teams and Webex. A reminder drops out of the notch 10 minutes before a meeting and again when it starts.
 - **Claude.** Live status of your Claude Code sessions: working, waiting for you, your turn, done, with a progress bar built from each session's plan. When Claude needs an answer, the notch lights up and a notice pops out.
 - **Jira.** Three views: your open issues, your issues in the current sprint, and a status queue showing everyone's issues in one status you pick (say, Ready to Test). Projects are picked up from the issues you've worked on, with a switcher when there's more than one. Start an issue with one click or move it to any status. Connect it in Integrations (the gear) with your Jira address, email and an API token kept in the Keychain.
-- **Messages.** Unread Slack, Telegram and mail in one feed, filtered by source; click to jump there. Works with apps (Slack, Mail, Outlook, Telegram) and with web apps in the browser (Gmail, Telegram Web, Slack, Outlook on the web). A message stays until you read it in its app. Built on the notifications your Mac already receives, so no tokens or sign-in: it needs Full Disk Access to read them.
+- **Messages.** Unread Slack, Telegram and mail in one feed, filtered by source; click to jump there. Works with apps (Slack, Mail, Outlook, Telegram) and with web apps in the browser (Gmail, Telegram Web, Slack, Outlook on the web). A message counts as read once you've been in its app or its browser tab after it arrived. Built on the notifications your Mac already receives, so no tokens or sign-in: it needs Full Disk Access to read them.
 - **Shelf.** New screenshots and screen recordings appear here automatically, along with images you copy. Drag them out wherever you need them, or drop any file onto the notch to keep it for later.
 - **Clipboard.** Recent text you copied plus saved snippets, one click to copy again. Anything a password manager marks as secret is never recorded.
 - **Translate.** English ↔ Russian with automatic direction. Type or dictate, then copy the translation.
 - **Accounts.** A searchable vault for test accounts: service, login, password and notes, grouped by service. Encrypted on disk with a key kept in your Keychain; copied passwords clear from the clipboard after a minute. Paste rows from a table to import them.
 - **Notes.** Your Apple Notes with search. Plain-text notes are edited right in the panel; notes with images, checklists or tables open read-only with a shortcut to Notes.
-- **Media.** Appears only while something plays: a YouTube tab, Yandex Music, any app. Shows which app is playing and its window title, with play/pause and skip working like the keyboard's media keys.
+- **Media.** Appears only while something plays. For a browser tab (YouTube, Yandex Music on the web…) it shows the real title, artist and cover with a scrubber, play/pause, ±10 s and next, driving the page's own player (turn on "Allow JavaScript from Apple Events" in the browser once). Other apps get their window title and media-key controls.
 - **Keep Awake.** One tap keeps your Mac from sleeping while long work runs, for an hour, three hours or until you turn it off.
 
 Every tab can be turned off in Settings (the gear); a turned-off tab disappears and stops its background work.
@@ -55,7 +55,7 @@ Halu asks only when a feature needs it:
 | Voice input | Microphone and Speech Recognition |
 | Notes | Automation access to Notes |
 | Messages | Full Disk Access (macOS keeps notifications in a protected database) |
-| Media | Accessibility (to read the playing app's title and press media keys) |
+| Media | Accessibility (app titles, media keys); Automation for your browser |
 
 ## Connecting Claude Code
 
