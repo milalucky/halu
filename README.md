@@ -20,7 +20,7 @@ Halu stays invisible until you point at the notch, then unfolds into a small pan
 - **Translate.** English ↔ Russian with automatic direction. Type or dictate, then copy the translation.
 - **Accounts.** A searchable vault for test accounts: service, login, password and notes, grouped by service. Encrypted on disk with a key kept in your Keychain; copied passwords clear from the clipboard after a minute. Paste rows from a table to import them.
 - **Notes.** Your Apple Notes with search. Plain-text notes are edited right in the panel; notes with images, checklists or tables open read-only with a shortcut to Notes.
-- **Media.** Music and Spotify with artwork, a scrubber and transport controls. For anything else, such as a video in the browser, play/pause and skip buttons that work like the keyboard's media keys.
+- **Media.** Appears only while something plays: a YouTube tab, Yandex Music, any app. Shows which app is playing and its window title, with play/pause and skip working like the keyboard's media keys.
 - **Keep Awake.** One tap keeps your Mac from sleeping while long work runs, for an hour, three hours or until you turn it off.
 
 On the roadmap: Jira and Slack integrations, a Messages tab, and an iPhone companion app with sync.
@@ -50,7 +50,7 @@ Halu asks only when a feature needs it:
 | Shelf | Access to your screenshot folder |
 | Voice input | Microphone and Speech Recognition |
 | Notes | Automation access to Notes |
-| Media | Automation access to Music or Spotify; Accessibility for media keys |
+| Media | Accessibility (to read the playing app's title and press media keys) |
 
 ## Connecting Claude Code
 

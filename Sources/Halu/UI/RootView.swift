@@ -66,7 +66,7 @@ struct ExpandedView: View {
         VStack(spacing: 0) {
             HeaderBar(model: model, awake: services.awake, claude: services.claude, geometry: geometry)
             HStack(spacing: 0) {
-                Sidebar(model: model, claude: services.claude)
+                Sidebar(model: model, claude: services.claude, media: services.media)
                 Rectangle().fill(Theme.hairline).frame(width: 1).padding(.vertical, 6)
                 Group {
                     switch model.tab {
@@ -152,11 +152,17 @@ struct HeaderBar: View {
 struct Sidebar: View {
     @ObservedObject var model: AppModel
     @ObservedObject var claude: ClaudeStore
+    @ObservedObject var media: MediaStore
     @Namespace private var selection
+
+    /// Media only shows up while something plays or sits paused.
+    private var tabs: [Tab] {
+        Tab.allCases.filter { $0 != .media || media.source != nil || model.tab == .media }
+    }
 
     var body: some View {
         VStack(spacing: 2) {
-            ForEach(Tab.allCases) { tab in
+            ForEach(tabs) { tab in
                 TabButton(tab: tab, selected: model.tab == tab, dot: tab == .claude && !claude.attention.isEmpty,
                           selection: selection) {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { model.tab = tab }
@@ -164,6 +170,7 @@ struct Sidebar: View {
             }
             Spacer(minLength: 0)
         }
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: tabs)
         .padding(.top, 4)
         .padding(.bottom, 14)
         .frame(width: 58)

@@ -1,44 +1,32 @@
 import AppKit
 import ApplicationServices
+import CoreAudio
 
-struct NowPlaying: Equatable {
-    enum Player: String {
-        case music = "Music"
-        case spotify = "Spotify"
-
-        var bundleID: String { self == .music ? "com.apple.Music" : "com.spotify.client" }
-    }
-
-    var player: Player
-    var title: String
-    var artist: String
-    var album: String
-    var duration: TimeInterval
-    var position: TimeInterval
+/// Whatever is making sound right now: a YouTube tab, Yandex Music, a podcast app.
+struct MediaSource: Equatable {
+    var pid: pid_t
+    var appName: String
+    var bundleID: String
+    /// The app's front window title, e.g. "Song name – YouTube"; nil without Accessibility access.
+    var title: String?
     var isPlaying: Bool
-    /// When `position` was read, so the scrubber can keep moving between polls.
-    var readAt: Date
-
-    func position(at now: Date) -> TimeInterval {
-        guard isPlaying else { return position }
-        return min(duration > 0 ? duration : .greatestFiniteMagnitude, position + now.timeIntervalSince(readAt))
-    }
+    var lastHeard: Date
 }
 
-/// Music and Spotify through their own AppleScript; any other source (a browser video,
-/// a podcast app) through the system media keys, which go to whatever macOS is playing.
+/// Finds the app playing audio through Core Audio's process list (public API, no permission) and
+/// controls it with the system media keys, which macOS routes to its current "now playing" app.
+/// Window titles and media keys both need Accessibility access.
 @MainActor
 final class MediaStore: ObservableObject {
-    @Published private(set) var nowPlaying: NowPlaying?
-    @Published private(set) var artwork: NSImage?
-    @Published private(set) var canSendMediaKeys = AXIsProcessTrusted()
+    @Published private(set) var source: MediaSource?
+    @Published private(set) var canControl = AXIsProcessTrusted()
 
-    private let bridge = MediaBridge()
+    /// A paused source stays on screen this long, so it can be resumed.
+    private let pausedLinger: TimeInterval = 30 * 60
     private var timer: Timer?
-    private var artworkKey: String?
 
     func start() {
-        let timer = Timer(timeInterval: 2, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 1.5, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -47,56 +35,30 @@ final class MediaStore: ObservableObject {
     }
 
     func refresh() {
-        canSendMediaKeys = AXIsProcessTrusted()
-        // Only ask players that are already open: scripting a closed app would launch it.
-        let running = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
-        let players = [NowPlaying.Player.music, .spotify].filter { running.contains($0.bundleID) }
-        guard !players.isEmpty else {
-            if nowPlaying != nil { nowPlaying = nil; artwork = nil; artworkKey = nil }
-            return
-        }
-        bridge.read(players) { [weak self] states in
-            guard let self else { return }
-            // The one that is playing wins; otherwise the first with a paused track.
-            let pick = states.first { $0.isPlaying } ?? states.first
-            if self.nowPlaying != pick { self.nowPlaying = pick }
-            self.loadArtworkIfNeeded(pick)
+        canControl = AXIsProcessTrusted()
+        let now = Date()
+        if let playing = Self.appPlayingAudio() {
+            var next = MediaSource(pid: playing.processIdentifier, appName: playing.localizedName ?? "Media",
+                                   bundleID: playing.bundleIdentifier ?? "", title: nil, isPlaying: true, lastHeard: now)
+            next.title = canControl ? Self.windowTitle(of: playing) : nil
+            if next != source { source = next }
+        } else if var current = source {
+            let stillOpen = NSRunningApplication(processIdentifier: current.pid) != nil
+            if !stillOpen || now.timeIntervalSince(current.lastHeard) > pausedLinger {
+                source = nil
+            } else if current.isPlaying {
+                current.isPlaying = false
+                source = current
+            }
         }
     }
 
-    // MARK: Player commands
-
-    func playPause() { command("playpause") }
-    func next() { command("next track") }
-    func previous() { command("previous track") }
-
-    func seek(to seconds: TimeInterval) {
-        guard var current = nowPlaying else { return }
-        bridge.run("tell application \"\(current.player.rawValue)\" to set player position to \(Int(seconds))") { [weak self] in
-            self?.refresh()
-        }
-        current.position = seconds
-        current.readAt = .now
-        nowPlaying = current
+    var icon: NSImage? {
+        source.flatMap { NSRunningApplication(processIdentifier: $0.pid)?.icon }
     }
 
-    func openPlayer() {
-        guard let player = nowPlaying?.player,
-              let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: player.bundleID) else { return }
-        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
-    }
-
-    private func command(_ verb: String) {
-        guard let player = nowPlaying?.player else { return }
-        if verb == "playpause", var current = nowPlaying {
-            current.isPlaying.toggle()
-            current.position = current.position(at: .now)
-            current.readAt = .now
-            nowPlaying = current
-        }
-        bridge.run("tell application \"\(player.rawValue)\" to \(verb)") { [weak self] in
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self?.refresh() }
-        }
+    func openApp() {
+        NSRunningApplication(processIdentifier: source?.pid ?? 0)?.activate()
     }
 
     // MARK: Media keys
@@ -107,7 +69,7 @@ final class MediaStore: ObservableObject {
 
     func send(_ key: MediaKey) {
         guard AXIsProcessTrusted() else {
-            requestMediaKeyAccess()
+            requestAccess()
             return
         }
         for down in [true, false] {
@@ -117,91 +79,101 @@ final class MediaStore: ObservableObject {
                                windowNumber: 0, context: nil, subtype: 8, data1: data1, data2: -1)?
                 .cgEvent?.post(tap: .cghidEventTap)
         }
+        if key == .playPause, var current = source {
+            current.isPlaying.toggle()
+            current.lastHeard = .now
+            source = current
+        }
     }
 
-    func requestMediaKeyAccess() {
+    func requestAccess() {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        canSendMediaKeys = AXIsProcessTrustedWithOptions(options)
+        canControl = AXIsProcessTrustedWithOptions(options)
     }
 
-    // MARK: Artwork
+    // MARK: Core Audio
 
-    private func loadArtworkIfNeeded(_ playing: NowPlaying?) {
-        guard let playing else {
-            artwork = nil
-            artworkKey = nil
-            return
+    /// The app (not its helper process) that is sending audio to an output right now.
+    private static func appPlayingAudio() -> NSRunningApplication? {
+        let ownPID = ProcessInfo.processInfo.processIdentifier
+        for object in processObjects() {
+            guard uint32(object, kAudioProcessPropertyIsRunningOutput) != 0,
+                  let pid = pid(object), pid != ownPID else { continue }
+            if let app = owningApp(pid: pid, bundleID: string(object, kAudioProcessPropertyBundleID)) { return app }
         }
-        let key = "\(playing.player.rawValue)|\(playing.title)|\(playing.artist)|\(playing.album)"
-        guard key != artworkKey else { return }
-        artworkKey = key
-        artwork = nil
-        bridge.artwork(for: playing.player) { [weak self] image in
-            guard let self, self.artworkKey == key else { return }
-            self.artwork = image
-        }
-    }
-}
-
-/// AppleScript calls on a background queue.
-final class MediaBridge: @unchecked Sendable {
-    private let queue = DispatchQueue(label: "halu.media", qos: .userInitiated)
-
-    func read(_ players: [NowPlaying.Player], _ done: @escaping @MainActor ([NowPlaying]) -> Void) {
-        queue.async {
-            let now = Date()
-            let states = players.compactMap { player -> NowPlaying? in
-                // Spotify reports duration in milliseconds, Music in seconds.
-                let source = """
-                tell application "\(player.rawValue)"
-                    if player state is stopped then return {}
-                    set t to current track
-                    return {name of t, artist of t, album of t, duration of t, player position, (player state as text)}
-                end tell
-                """
-                guard let output = Self.execute(source), output.numberOfItems >= 6 else { return nil }
-                var duration = output.atIndex(4)?.doubleValue ?? 0
-                if player == .spotify { duration /= 1000 }
-                return NowPlaying(player: player,
-                                  title: output.atIndex(1)?.stringValue ?? "",
-                                  artist: output.atIndex(2)?.stringValue ?? "",
-                                  album: output.atIndex(3)?.stringValue ?? "",
-                                  duration: duration,
-                                  position: output.atIndex(5)?.doubleValue ?? 0,
-                                  isPlaying: output.atIndex(6)?.stringValue == "playing",
-                                  readAt: now)
-            }
-            DispatchQueue.main.async { MainActor.assumeIsolated { done(states) } }
-        }
+        return nil
     }
 
-    func artwork(for player: NowPlaying.Player, _ done: @escaping @MainActor (NSImage?) -> Void) {
-        queue.async {
-            var image: NSImage?
-            switch player {
-            case .music:
-                let output = Self.execute("tell application \"Music\" to get data of artwork 1 of current track")
-                if let data = output?.data { image = NSImage(data: data) }
-            case .spotify:
-                if let link = Self.execute("tell application \"Spotify\" to get artwork url of current track")?.stringValue,
-                   let url = URL(string: link), let data = try? Data(contentsOf: url) {
-                    image = NSImage(data: data)
-                }
-            }
-            DispatchQueue.main.async { MainActor.assumeIsolated { done(image) } }
+    /// Browsers and Electron apps play sound from helper processes; map them to the app the user sees.
+    private static func owningApp(pid: pid_t, bundleID: String?) -> NSRunningApplication? {
+        if let app = NSRunningApplication(processIdentifier: pid), app.activationPolicy == .regular { return app }
+        guard let bundleID else { return nil }
+        let apps = NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }
+        if bundleID.hasPrefix("com.apple.WebKit") {
+            return apps.first { $0.bundleIdentifier == "com.apple.Safari" }
         }
+        // "com.google.Chrome.helper", "ru.yandex.desktop.music.helper.Renderer" → the app whose id prefixes it.
+        return apps
+            .filter { app in app.bundleIdentifier.map { bundleID.hasPrefix($0 + ".") } ?? false }
+            .max { ($0.bundleIdentifier?.count ?? 0) < ($1.bundleIdentifier?.count ?? 0) }
     }
 
-    func run(_ source: String, _ done: @escaping @MainActor () -> Void) {
-        queue.async {
-            _ = Self.execute(source)
-            DispatchQueue.main.async { MainActor.assumeIsolated { done() } }
-        }
+    private static func address(_ selector: AudioObjectPropertySelector) -> AudioObjectPropertyAddress {
+        AudioObjectPropertyAddress(mSelector: selector, mScope: kAudioObjectPropertyScopeGlobal,
+                                   mElement: kAudioObjectPropertyElementMain)
     }
 
-    private static func execute(_ source: String) -> NSAppleEventDescriptor? {
-        var error: NSDictionary?
-        let output = NSAppleScript(source: source)?.executeAndReturnError(&error)
-        return error == nil ? output : nil
+    private static func processObjects() -> [AudioObjectID] {
+        var address = address(kAudioHardwarePropertyProcessObjectList)
+        let system = AudioObjectID(kAudioObjectSystemObject)
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(system, &address, 0, nil, &size) == noErr, size > 0 else { return [] }
+        var objects = [AudioObjectID](repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
+        guard AudioObjectGetPropertyData(system, &address, 0, nil, &size, &objects) == noErr else { return [] }
+        return objects
+    }
+
+    private static func uint32(_ object: AudioObjectID, _ selector: AudioObjectPropertySelector) -> UInt32 {
+        var address = address(selector)
+        var value: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        return AudioObjectGetPropertyData(object, &address, 0, nil, &size, &value) == noErr ? value : 0
+    }
+
+    private static func pid(_ object: AudioObjectID) -> pid_t? {
+        var address = address(kAudioProcessPropertyPID)
+        var value: pid_t = -1
+        var size = UInt32(MemoryLayout<pid_t>.size)
+        return AudioObjectGetPropertyData(object, &address, 0, nil, &size, &value) == noErr && value > 0 ? value : nil
+    }
+
+    private static func string(_ object: AudioObjectID, _ selector: AudioObjectPropertySelector) -> String? {
+        var address = address(selector)
+        var value: Unmanaged<CFString>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        guard AudioObjectGetPropertyData(object, &address, 0, nil, &size, &value) == noErr,
+              let string = value?.takeRetainedValue() else { return nil }
+        return string as String
+    }
+
+    // MARK: Accessibility
+
+    private static let browserSuffixes = [" - Google Chrome", " — Google Chrome", " - Яндекс Браузер", " — Яндекс Браузер",
+                                          " - Arc", " — Mozilla Firefox", " - Microsoft Edge"]
+
+    private static func windowTitle(of app: NSRunningApplication) -> String? {
+        let element = AXUIElementCreateApplication(app.processIdentifier)
+        var window: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXMainWindowAttribute as CFString, &window) == .success
+                || AXUIElementCopyAttributeValue(element, kAXFocusedWindowAttribute as CFString, &window) == .success,
+              let window else { return nil }
+        var title: CFTypeRef?
+        // swiftlint:disable:next force_cast
+        guard AXUIElementCopyAttributeValue(window as! AXUIElement, kAXTitleAttribute as CFString, &title) == .success,
+              var text = title as? String, !text.isEmpty else { return nil }
+        for suffix in browserSuffixes where text.hasSuffix(suffix) {
+            text = String(text.dropLast(suffix.count))
+        }
+        return text
     }
 }
