@@ -48,7 +48,10 @@ final class ClaudeStore: ObservableObject {
 
     func start() {
         let directory = HaluPaths.ensure(HaluPaths.claudeSessions)
-        if hooksInstalled { try? HookInstaller.refreshHookBinary() }
+        if hooksInstalled {
+            try? HookInstaller.refreshHookBinary()
+            try? HookInstaller.upgrade()
+        }
         reload()
 
         let descriptor = open(directory.path, O_EVTONLY)

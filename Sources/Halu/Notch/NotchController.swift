@@ -82,7 +82,7 @@ final class NotchController {
             guard let self, let panel else { return }
             self.collapse(panel)
         }
-        let root = RootView(state: panel.state, model: services.model, notices: services.notices, live: services.live,
+        let root = RootView(state: panel.state, model: services.model, notices: services.notices, live: services.live, requests: services.claudeRequests,
                             claude: services.claude, messages: services.messages, services: services, actions: panel.actions)
         let host = FirstMouseHostingView(rootView: root)
         host.sizingOptions = []
@@ -100,7 +100,8 @@ final class NotchController {
     }
 
     private func display(of panel: ScreenPanel) -> Display {
-        Layout.display(expanded: panel.state.isExpanded, hasNotice: services.notices.current != nil,
+        Layout.display(expanded: panel.state.isExpanded, hasRequest: services.claudeRequests.current != nil,
+                       hasNotice: services.notices.current != nil,
                        live: services.live.activity != nil, attention: services.attentionCount, hasNotch: panel.state.geometry.hasNotch)
     }
 
@@ -159,7 +160,7 @@ final class NotchController {
                     panel.leaveSince = since
                     if now.timeIntervalSince(since) >= leaveDelay { collapse(panel) }
                 }
-            } else if current != .notice {
+            } else if current != .notice && current != .request {
                 let triggerWidth = current == .badge || current == .live ? Layout.size(current, g).width : nil
                 if g.isInTrigger(point, width: triggerWidth) {
                     if isFileDrag {

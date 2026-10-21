@@ -78,6 +78,12 @@ final class NoticeCenter: ObservableObject {
         }
     }
 
+    /// Drops Claude notices: a request card in the notch is asking the same thing.
+    func dismissClaude() {
+        queue.removeAll { $0.tab == .claude }
+        if current?.tab == .claude { dismiss() }
+    }
+
     func dismiss() {
         dismissWork?.cancel()
         current = nil

@@ -13,6 +13,7 @@ struct WindowRootView: View {
                 Text("Halu").font(Theme.title(14)).foregroundStyle(Theme.primary)
                 Text(model.tab.title).font(Theme.title(14)).foregroundStyle(Theme.tertiary)
                 Spacer()
+                ClaudeUsagePill(requests: services.claudeRequests)
                 SpeedLabel(speed: services.speed)
                 ChatButton(model: model)
                 PomodoroButton(pomodoro: services.pomodoro)

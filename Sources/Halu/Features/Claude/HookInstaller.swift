@@ -38,6 +38,36 @@ enum HookInstaller {
         try manager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: hookURL.path)
     }
 
+    /// Brings an earlier install up to date: hooks that wait for an answer from the notch get a 120 s
+    /// timeout, and the status line (for plan usage) is added when there's none. Anything else is left alone.
+    static func upgrade() throws {
+        guard isInstalled, let data = try? Data(contentsOf: settingsURL),
+              var settings = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+        var changed = false
+        var hooks = settings["hooks"] as? [String: Any] ?? [:]
+        for event in ["PermissionRequest", "PreToolUse"] {
+            var groups = hooks[event] as? [[String: Any]] ?? []
+            for g in groups.indices {
+                var commands = groups[g]["hooks"] as? [[String: Any]] ?? []
+                for c in commands.indices where commands[c]["command"] as? String == hookURL.path && commands[c]["timeout"] as? Int != 120 {
+                    commands[c]["timeout"] = 120
+                    changed = true
+                }
+                groups[g]["hooks"] = commands
+            }
+            hooks[event] = groups
+        }
+        settings["hooks"] = hooks
+        if settings["statusLine"] == nil {
+            settings["statusLine"] = ["type": "command", "command": hookURL.path + " statusline", "padding": 0]
+            changed = true
+        }
+        guard changed else { return }
+        try data.write(to: settingsURL.appendingPathExtension("halu-backup"), options: .atomic)
+        let updated = try JSONSerialization.data(withJSONObject: settings, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
+        try updated.write(to: settingsURL, options: .atomic)
+    }
+
     static func install() throws {
         try refreshHookBinary()
 
@@ -51,8 +81,10 @@ enum HookInstaller {
         }
 
         var hooks = settings["hooks"] as? [String: Any] ?? [:]
-        let command: [String: Any] = ["type": "command", "command": hookURL.path, "timeout": 5]
         for event in events {
+            // These two may wait for an answer from the notch.
+            let timeout = event == "PermissionRequest" || event == "PreToolUse" ? 120 : 5
+            let command: [String: Any] = ["type": "command", "command": hookURL.path, "timeout": timeout]
             var groups = hooks[event] as? [[String: Any]] ?? []
             let present = groups.contains { group in
                 (group["hooks"] as? [[String: Any]] ?? []).contains { $0["command"] as? String == hookURL.path }
@@ -64,6 +96,9 @@ enum HookInstaller {
             hooks[event] = groups
         }
         settings["hooks"] = hooks
+        if settings["statusLine"] == nil {
+            settings["statusLine"] = ["type": "command", "command": hookURL.path + " statusline", "padding": 0]
+        }
 
         let data = try JSONSerialization.data(withJSONObject: settings, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
         try data.write(to: settingsURL, options: .atomic)

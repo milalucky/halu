@@ -112,6 +112,7 @@ final class Services {
     let vpn = VPNController()
     let speed = NetworkSpeed()
     let pomodoro = PomodoroTimer()
+    let claudeRequests = ClaudeRequests()
     lazy var live = LiveCenter(calendar: calendar, pomodoro: pomodoro)
 
     /// Something waiting for the user, shown on the collapsed notch: Claude first, then unread messages.
@@ -144,6 +145,7 @@ final class Services {
                          tab: .tasks, duration: 12, sound: "Glass"))
         }
         live.start()
+        claudeRequests.start()
         calendar.onReminder = { [notices] meeting, reminder in
             notices.post(.meeting(meeting, reminder))
         }

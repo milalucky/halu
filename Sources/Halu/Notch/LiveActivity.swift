@@ -58,12 +58,14 @@ struct LiveView: View {
             let now = context.date
             let state = state(at: now)
             ZStack {
-                shape
-                    .trim(from: 0, to: max(0.001, state.remaining))
-                    .stroke(LinearGradient(colors: [state.tint.opacity(0.35), state.tint], startPoint: .leading, endPoint: .trailing),
-                            style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                    .shadow(color: state.tint.opacity(state.urgent ? 0.9 : 0.5), radius: state.urgent ? 6 : 3)
-                    .animation(.linear(duration: 1), value: state.remaining)
+                // The line drains from both top ends toward the bottom centre.
+                ForEach([true, false], id: \.self) { leading in
+                    NotchEdge(topRadius: shape.topRadius, bottomRadius: shape.bottomRadius, leading: leading)
+                        .trim(from: 0, to: max(0.001, state.remaining))
+                        .stroke(state.tint, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                        .shadow(color: state.tint.opacity(state.urgent ? 0.8 : 0.45), radius: state.urgent ? 5 : 3)
+                }
+                .animation(.linear(duration: 1), value: state.remaining)
                 HStack(spacing: 0) {
                     HStack(spacing: 5) {
                         Image(systemName: state.icon)

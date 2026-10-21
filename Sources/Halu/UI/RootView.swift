@@ -5,6 +5,7 @@ struct RootView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var notices: NoticeCenter
     @ObservedObject var live: LiveCenter
+    @ObservedObject var requests: ClaudeRequests
     @ObservedObject var claude: ClaudeStore
     @ObservedObject var messages: MessagesStore
     let services: Services
@@ -14,7 +15,7 @@ struct RootView: View {
     private var unread: Int { model.isEnabled(.messages) ? messages.unseen : 0 }
 
     private var display: Display {
-        Layout.display(expanded: state.isExpanded, hasNotice: notices.current != nil, live: live.activity != nil,
+        Layout.display(expanded: state.isExpanded, hasRequest: requests.current != nil, hasNotice: notices.current != nil, live: live.activity != nil,
                        attention: claudeWaiting + unread, hasNotch: state.geometry.hasNotch)
     }
 
@@ -23,7 +24,7 @@ struct RootView: View {
         let size = Layout.size(display, state.geometry)
         let radii = Layout.radii(display)
         let shape = NotchShape(topRadius: radii.top, bottomRadius: radii.bottom)
-        let lifted = display == .expanded || display == .notice
+        let lifted = display == .expanded || display == .notice || display == .request
 
         ZStack(alignment: .top) {
             shape
@@ -57,6 +58,11 @@ struct RootView: View {
                 actions.open(services.attentionTab)
             }
                 .transition(.opacity)
+        case .request:
+            if let request = requests.current {
+                ClaudeRequestView(request: request, top: Layout.noticeTop(state.geometry), requests: requests)
+                    .transition(.opacity.animation(.easeOut(duration: 0.2)))
+            }
         case .live:
             if let activity = live.activity {
                 LiveView(activity: activity, attention: claudeWaiting + unread > 0, pomodoro: services.pomodoro,
@@ -166,6 +172,9 @@ struct HeaderBar: View {
                     .foregroundStyle(Theme.tertiary)
                     .contentTransition(.opacity)
                     .animation(.easeOut(duration: 0.15), value: model.tab)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                ClaudeUsagePill(requests: Services.shared.claudeRequests)
             }
             .frame(width: wing, alignment: .leading)
                 .padding(.leading, 22)
