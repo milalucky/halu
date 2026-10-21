@@ -10,35 +10,17 @@ struct IntegrationsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                SectionHeader(title: "Appearance", detail: "How the open panel looks")
-                Picker("", selection: $model.appearance) {
-                    ForEach(AppModel.Appearance.allCases) { Text($0.rawValue).tag($0) }
+                SectionHeader(title: "Theme", detail: "How the open panel looks")
+                HStack(spacing: 8) {
+                    ForEach(Style.allCases) { style in
+                        ThemeCard(style: style, selected: model.style == style) {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { model.style = style }
+                        }
+                    }
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
-                HStack(spacing: 18) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Colours").font(Theme.caption(11, weight: .semibold)).foregroundStyle(Theme.tertiary)
-                        Picker("", selection: $model.style) {
-                            ForEach(Style.allCases) { Text($0.rawValue).tag($0) }
-                        }
-                        .pickerStyle(.segmented).labelsHidden().fixedSize()
-                    }
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Panel size").font(Theme.caption(11, weight: .semibold)).foregroundStyle(Theme.tertiary)
-                        Picker("", selection: $model.panelSize) {
-                            ForEach(AppModel.PanelSize.allCases) { Text($0.rawValue).tag($0) }
-                        }
-                        .pickerStyle(.segmented).labelsHidden().fixedSize()
-                    }
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Opens on hover").font(Theme.caption(11, weight: .semibold)).foregroundStyle(Theme.tertiary)
-                        Picker("", selection: $model.hoverDelay) {
-                            ForEach(AppModel.HoverDelay.allCases) { Text($0.rawValue).tag($0) }
-                        }
-                        .pickerStyle(.segmented).labelsHidden().fixedSize()
-                    }
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 18) { sizePicker; hoverPicker }
+                    VStack(alignment: .leading, spacing: 10) { sizePicker; hoverPicker }
                 }
                 SectionHeader(title: "Tabs", detail: "Drag or use the arrows to reorder · turned-off tabs stop working in the background")
                 VStack(spacing: 3) {
@@ -57,6 +39,79 @@ struct IntegrationsView: View {
             }
         }
         .scrollIndicators(.never)
+    }
+
+    private var sizePicker: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Panel size").font(Theme.caption(11, weight: .semibold)).foregroundStyle(Theme.tertiary)
+            Picker("", selection: $model.panelSize) {
+                ForEach(AppModel.PanelSize.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented).labelsHidden().fixedSize()
+        }
+    }
+
+    private var hoverPicker: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Opens on hover").font(Theme.caption(11, weight: .semibold)).foregroundStyle(Theme.tertiary)
+            Picker("", selection: $model.hoverDelay) {
+                ForEach(AppModel.HoverDelay.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented).labelsHidden().fixedSize()
+        }
+    }
+}
+
+/// A theme to pick, with a little preview of how it looks.
+private struct ThemeCard: View {
+    let style: Style
+    let selected: Bool
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 6) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 9, style: .continuous).fill(preview)
+                    HStack(spacing: 4) {
+                        ForEach([Tab.tasks, .calendar, .finance, .messages], id: \.self) { tab in
+                            Circle().fill(style.color(for: tab)).frame(width: 9, height: 9)
+                                .shadow(color: style.glows ? style.color(for: tab) : .clear, radius: 4)
+                        }
+                    }
+                    if style.glows {
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .strokeBorder(AngularGradient(colors: [.purple, .pink, .cyan, .purple], center: .center), lineWidth: 1.2)
+                    }
+                }
+                .frame(height: 46)
+                HStack(spacing: 4) {
+                    Image(systemName: style.icon).font(.system(size: 10, weight: .bold))
+                    Text(style.rawValue).font(Theme.body(12, weight: .semibold))
+                }
+                .foregroundStyle(Theme.primary)
+                Text(style.blurb).font(Theme.caption(10, weight: .regular)).foregroundStyle(Theme.tertiary).lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(hovering ? Theme.cardHover : Theme.card))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(selected ? Theme.accent : .clear, lineWidth: 1.5))
+            .scaleEffect(hovering ? 1.02 : 1)
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: hovering)
+    }
+
+    private var preview: AnyShapeStyle {
+        switch style {
+        case .minimal: AnyShapeStyle(Color.black)
+        case .playful: AnyShapeStyle(RadialGradient(colors: [style.color(for: .tasks).opacity(0.45), .black], center: .topLeading, startRadius: 0, endRadius: 120))
+        case .neon: AnyShapeStyle(LinearGradient(colors: [Color(red: 0.06, green: 0.03, blue: 0.16), .black], startPoint: .top, endPoint: .bottom))
+        case .glass: AnyShapeStyle(LinearGradient(colors: [Color.white.opacity(0.18), Color.white.opacity(0.05)], startPoint: .topLeading, endPoint: .bottomTrailing))
+        }
     }
 }
 

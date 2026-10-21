@@ -29,13 +29,10 @@ struct RootView: View {
         let lifted = display == .expanded || display == .notice || display == .request
 
         ZStack(alignment: .top) {
-            PanelBackground(shape: shape, glass: lifted ? model.appearance : .black, headerHeight: Layout.headerHeight(state.geometry))
+            PanelBackground(shape: shape, style: model.style, open: lifted, headerHeight: Layout.headerHeight(state.geometry))
                 .shadow(color: .black.opacity(lifted ? 0.55 : 0), radius: 22, y: 10)
-            if display == .expanded && model.style.glows {
-                // Neon: the panel's rim glows in the tab's colour.
-                shape.stroke(Theme.accent.opacity(0.55), lineWidth: 1.2)
-                    .shadow(color: Theme.accent.opacity(0.6), radius: 8)
-                    .allowsHitTesting(false)
+            if lifted && model.style.glows {
+                NeonRim(shape: shape)
             }
             content(display)
                 .frame(width: size.width, height: size.height, alignment: .top)
@@ -118,39 +115,75 @@ struct TabContent: View {
     }
 }
 
-/// Black like the notch, or Liquid Glass with a black band along the top so the notch still melts in.
+/// The open panel's backdrop for the theme. Collapsed states are always black, to melt into the notch.
 struct PanelBackground: View {
     let shape: NotchShape
-    let glass: AppModel.Appearance
+    let style: Style
+    let open: Bool
     let headerHeight: CGFloat
 
     var body: some View {
-        switch glass {
-        case .black:
+        if !open {
             shape.fill(Color.black)
-        case .darkGlass, .lightGlass:
-            let light = glass == .lightGlass
-            ZStack(alignment: .top) {
-                Color.clear.modifier(GlassFill(shape: shape, light: light))
-                LinearGradient(stops: [.init(color: .black, location: 0), .init(color: .black, location: 0.7), .init(color: .black.opacity(0), location: 1)],
-                               startPoint: .top, endPoint: .bottom)
-                    .frame(height: headerHeight + 10)
-                    .clipShape(shape)
+        } else {
+            switch style {
+            case .minimal:
+                shape.fill(Color.black)
+            case .playful:
+                // A soft wash of the tab's colour from the top-left corner.
+                ZStack {
+                    shape.fill(Color.black)
+                    shape.fill(RadialGradient(colors: [Theme.accent.opacity(0.28), Theme.accent.opacity(0.06), .clear],
+                                              center: .init(x: 0.1, y: 0.15), startRadius: 0, endRadius: 520))
+                    shape.fill(RadialGradient(colors: [Theme.accent.opacity(0.1), .clear], center: .init(x: 0.95, y: 1), startRadius: 0, endRadius: 360))
+                }
+                .animation(.easeInOut(duration: 0.5), value: Theme.accent.description)
+            case .neon:
+                ZStack {
+                    shape.fill(LinearGradient(colors: [Color(red: 0.03, green: 0.02, blue: 0.08), Color(red: 0.01, green: 0.01, blue: 0.03)],
+                                              startPoint: .top, endPoint: .bottom))
+                    shape.fill(RadialGradient(colors: [Theme.accent.opacity(0.16), .clear], center: .bottom, startRadius: 0, endRadius: 420))
+                }
+            case .glass:
+                ZStack(alignment: .top) {
+                    Color.clear.modifier(GlassFill(shape: shape))
+                    shape.fill(RadialGradient(colors: [Theme.accent.opacity(0.18), .clear], center: .init(x: 0.1, y: 0.2), startRadius: 0, endRadius: 480))
+                    LinearGradient(stops: [.init(color: .black, location: 0), .init(color: .black, location: 0.7), .init(color: .black.opacity(0), location: 1)],
+                                   startPoint: .top, endPoint: .bottom)
+                        .frame(height: headerHeight + 10)
+                        .clipShape(shape)
+                }
             }
         }
     }
 }
 
+/// Neon: a gradient rim that slowly travels round the panel.
+struct NeonRim: View {
+    let shape: NotchShape
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1 / 30)) { context in
+            let turn = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 6) / 6
+            let gradient = AngularGradient(colors: [Theme.accent, Color(red: 1, green: 0.2, blue: 0.75), Color(red: 0.2, green: 0.85, blue: 1), Theme.accent],
+                                           center: .center, angle: .degrees(turn * 360))
+            shape.stroke(gradient, lineWidth: 1.5)
+                .shadow(color: Theme.accent.opacity(0.7), radius: 6)
+                .shadow(color: Color(red: 1, green: 0.2, blue: 0.75).opacity(0.35), radius: 14)
+        }
+        .allowsHitTesting(false)
+    }
+}
+
 private struct GlassFill: ViewModifier {
     let shape: NotchShape
-    let light: Bool
 
     func body(content: Content) -> some View {
         if #available(macOS 26.0, *) {
-            content.glassEffect(.regular.tint(light ? Color.white.opacity(0.55) : Color.black.opacity(0.45)), in: shape)
+            content.glassEffect(.regular.tint(Color.black.opacity(0.4)), in: shape)
         } else {
-            content.background(light ? .regularMaterial : .ultraThinMaterial, in: shape)
-                .background(shape.fill(light ? Color.white.opacity(0.5) : Color.black.opacity(0.5)))
+            content.background(.ultraThinMaterial, in: shape)
+                .background(shape.fill(Color.black.opacity(0.5)))
         }
     }
 }
@@ -176,7 +209,6 @@ struct ExpandedView: View {
                 .padding(.bottom, 16)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
-            .environment(\.colorScheme, model.appearance == .lightGlass ? .light : .dark)
         }
         .onDrop(of: [.fileURL], isTargeted: $dropTargeted) { providers in
             // On Tools → Compare a drop anywhere fills the empty side; elsewhere files go to the Shelf.
@@ -348,6 +380,7 @@ struct TabButton: View {
                     }
                 }
                 .foregroundStyle(selected ? (Style.current == .minimal ? Theme.primary : Style.current.color(for: tab))
+                                          : Style.current == .playful ? Style.current.color(for: tab).opacity(hovering ? 0.9 : 0.55)
                                           : (hovering ? Theme.secondary : Theme.tertiary))
                 .shadow(color: selected && Style.current.glows ? Style.current.color(for: tab) : .clear, radius: 4)
             }

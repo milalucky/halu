@@ -67,16 +67,6 @@ final class AppModel: ObservableObject {
         }
     }
 
-    enum Appearance: String, CaseIterable, Identifiable {
-        case black = "Black", darkGlass = "Dark Glass", lightGlass = "Light Glass"
-        var id: String { rawValue }
-    }
-
-    /// How the open panel looks: black like the notch, or Liquid Glass, dark or light.
-    @Published var appearance = Appearance(rawValue: UserDefaults.standard.string(forKey: "appearance") ?? "") ?? .black {
-        didSet { UserDefaults.standard.set(appearance.rawValue, forKey: "appearance") }
-    }
-
     enum PanelSize: String, CaseIterable, Identifiable {
         case compact = "Compact", comfortable = "Comfortable", wide = "Wide"
         var id: String { rawValue }

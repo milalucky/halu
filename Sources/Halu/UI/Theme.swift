@@ -12,8 +12,22 @@ enum Theme {
     static let primary = adaptive(dark: 0.92, light: 0.86)
     static let secondary = adaptive(dark: 0.55, light: 0.58)
     static let tertiary = adaptive(dark: 0.32, light: 0.38)
-    static let card = adaptive(dark: 0.055, light: 0.06)
-    static let cardHover = adaptive(dark: 0.095, light: 0.1)
+    /// Card fills: neutral in Minimal and Glass, tinted with the tab's colour in Playful and Neon.
+    static var card: Color {
+        switch Style.current {
+        case .playful: accent.opacity(0.1)
+        case .neon: accent.opacity(0.07)
+        default: Color.white.opacity(0.055)
+        }
+    }
+
+    static var cardHover: Color {
+        switch Style.current {
+        case .playful: accent.opacity(0.17)
+        case .neon: accent.opacity(0.13)
+        default: Color.white.opacity(0.095)
+        }
+    }
     static let hairline = adaptive(dark: 0.08, light: 0.1)
 
     /// Text on a `primary` fill (a selected chip): dark on the light chip of dark mode and the reverse.

@@ -7,6 +7,7 @@ struct ChatView: View {
     var body: some View {
         VStack(spacing: 8) {
             HStack(spacing: 6) {
+                Image(nsImage: BrandIcons.openAI).renderingMode(.template).resizable().frame(width: 14, height: 14).foregroundStyle(Theme.secondary)
                 Text("ChatGPT").font(Theme.body(12.5, weight: .semibold)).foregroundStyle(Theme.secondary)
                 if store.isLoading { ProgressView().controlSize(.mini) }
                 Spacer()
@@ -72,9 +73,11 @@ struct ChatButton: View {
                 }
             }
         } label: {
-            Image(systemName: on ? "bubble.left.and.text.bubble.right.fill" : "bubble.left.and.text.bubble.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(on ? Theme.primary : (hovering ? Theme.secondary : Theme.tertiary))
+            Image(nsImage: BrandIcons.openAI)
+                .renderingMode(.template)
+                .resizable()
+                .frame(width: 13, height: 13)
+                .foregroundStyle(on ? Theme.primary : (hovering ? Theme.primary : Theme.secondary))
                 .headerButton(active: on, hovering: hovering)
         }
         .buttonStyle(.plain)
