@@ -53,7 +53,11 @@ final class ClipboardStore: ObservableObject {
         board.clearContents()
         board.setString(text, forType: .string)
         ownChange = board.changeCount
-        record(text, app: nil)
+        // The row stays where it is, so the "Copied" confirmation lands on what was clicked.
+        if let index = history.firstIndex(where: { $0.text == text }) {
+            history[index].copiedAt = .now
+            historyFile.save(history)
+        }
     }
 
     func remove(_ entry: ClipEntry) {

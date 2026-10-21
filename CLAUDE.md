@@ -30,5 +30,7 @@ Later: Integrations screen with API keys — Jira (company Atlassian, API token)
 
 - **iPhone app** with the same features, **synced with the Mac app**. Keep models Codable and storage swappable so a sync backend (e.g. CloudKit) can be added later.
 - Keep Awake button (`caffeinate`) — one tap, animated. Done.
-- More quick-action buttons next to Keep Awake (one-tap commands). Ideas to be collected with the user.
+- More quick-action buttons next to Keep Awake (one-tap commands). Ideas so far: VPN on/off. More to be collected with the user.
+- Notes tab = Apple Notes (all notes, search; plain-text notes editable in Halu, rich notes read-only with "Open in Notes"; new notes go to the Notes folder).
+- Media tab: Now Playing through a helper dylib loaded into /usr/bin/perl (same technique as Cyclop, own implementation); play/pause/seek/skip for any source.
 - The animated Halu mark spins only where work is in progress (Claude tab, running tasks), never constantly in the main panel.

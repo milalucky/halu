@@ -19,7 +19,7 @@ Halu stays invisible until you point at the notch, then unfolds into a small pan
 - **Clipboard.** Recent text you copied plus saved snippets, one click to copy again. Anything a password manager marks as secret is never recorded.
 - **Translate.** English ↔ Russian with automatic direction. Type or dictate, then copy the translation.
 - **Accounts.** A searchable vault for test accounts: service, login, password and notes, grouped by service. Encrypted on disk with a key kept in your Keychain; copied passwords clear from the clipboard after a minute. Paste rows from a table to import them.
-- **Notes.** A quick scratch pad; empty notes clean themselves up.
+- **Notes.** Your Apple Notes with search. Plain-text notes are edited right in the panel; notes with images, checklists or tables open read-only with a shortcut to Notes.
 - **Keep Awake.** One tap keeps your Mac from sleeping while long work runs, for an hour, three hours or until you turn it off.
 
 On the roadmap: media controls, Jira and Slack integrations, and an iPhone companion app with sync.
@@ -46,6 +46,7 @@ Halu asks only when a feature needs it:
 | Calendar | Calendars (add your Google account in System Settings → Internet Accounts first) |
 | Shelf | Access to your screenshot folder |
 | Voice input | Microphone and Speech Recognition |
+| Notes | Automation access to Notes |
 
 ## Connecting Claude Code
 
