@@ -14,7 +14,10 @@ final class SpeechInput: ObservableObject {
 
     static let languages = ["ru-RU", "en-US"]
 
-    private let engine = AVAudioEngine()
+    private var engine = AVAudioEngine()
+    /// Bumped for every recording. A stopped recording keeps reporting for a moment (its final
+    /// result arrives late), and those reports must not reach, or stop, the next one.
+    private var session = 0
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
     private var onText: ((String) -> Void)?
@@ -75,7 +78,19 @@ final class SpeechInput: ObservableObject {
         isRecording = false
     }
 
+    /// Drops whatever an earlier recording left behind before a new one starts.
+    private func reset() {
+        task?.cancel()
+        task = nil
+        request = nil
+        teardownAudio()
+        engine = AVAudioEngine()
+    }
+
     private func begin() {
+        reset()
+        session += 1
+        let current = session
         guard engine.inputNode.outputFormat(forBus: 0).sampleRate > 0 else {
             problem = "No microphone input. Check the input device in System Settings → Sound."
             return
@@ -93,7 +108,8 @@ final class SpeechInput: ObservableObject {
 
         let input = engine.inputNode
         Self.installTap(on: input, feeding: request) { [weak self] level in
-            self?.level = level
+            guard let self, self.session == current else { return }
+            self.level = level
         }
         engine.prepare()
         do {
@@ -105,7 +121,7 @@ final class SpeechInput: ObservableObject {
         }
         isRecording = true
         task = Self.recognize(with: recognizer, request: request) { [weak self] text, isFinal, failure in
-            guard let self else { return }
+            guard let self, self.session == current else { return }
             if let text { self.onText?(text) }
             if let failure, text == nil {
                 NSLog("Halu: dictation failed: \(failure)")
