@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.milana.halu</string>
+    <key>CFBundleName</key>
+    <string>Halu</string>
+    <key>CFBundleDisplayName</key>
+    <string>Halu</string>
+    <key>CFBundleExecutable</key>
+    <string>Halu</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>15.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>Halu shows your upcoming meetings and reminds you before they start.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Halu listens only while you dictate a task or a translation.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Halu turns your voice into text when you dictate a task or a translation.</string>
+    <key>NSDocumentsFolderUsageDescription</key>
+    <string>Halu picks up new screenshots and screen recordings from your screenshot folder.</string>
+    <key>NSDesktopFolderUsageDescription</key>
+    <string>Halu picks up new screenshots and screen recordings from your screenshot folder.</string>
+</dict>
+</plist>
