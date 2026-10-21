@@ -26,7 +26,7 @@ struct ClaudeUsagePill: View {
             }
             .padding(.horizontal, 7)
             .frame(height: 20)
-            .background(Capsule().fill(Theme.card))
+            .glass(Capsule())
             .fixedSize()
             .help(help(usage))
         }

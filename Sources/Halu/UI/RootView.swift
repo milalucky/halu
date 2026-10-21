@@ -11,6 +11,8 @@ struct RootView: View {
     let services: Services
     let actions: PanelActions
 
+    @State private var gulp = false
+
     private var claudeWaiting: Int { model.isEnabled(.claude) ? claude.attention.count : 0 }
     private var unread: Int { model.isEnabled(.messages) ? messages.unseen : 0 }
 
@@ -37,7 +39,15 @@ struct RootView: View {
         .frame(width: size.width, height: size.height)
         .opacity(display == .hidden ? 0 : 1)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .animation(.spring(response: 0.38, dampingFraction: 0.82), value: display)
+        .scaleEffect(gulp ? 1.07 : 1, anchor: .top)
+        .animation(.spring(response: 0.38, dampingFraction: 0.74), value: display)
+        .onChange(of: model.gulps) {
+            // A file dropped on the notch: it swallows it.
+            withAnimation(.spring(response: 0.18, dampingFraction: 0.5)) { gulp = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.55)) { gulp = false }
+            }
+        }
         .environment(\.colorScheme, .dark)
     }
 
@@ -123,6 +133,7 @@ struct ExpandedView: View {
         }
         .onDrop(of: [.fileURL], isTargeted: $dropTargeted) { providers in
             // On Tools → Compare a drop anywhere fills the empty side; elsewhere files go to the Shelf.
+            model.gulps += 1
             if model.tab == .tools && services.tools.mode == .compare {
                 services.compare.load(providers: providers)
                 return true
@@ -152,6 +163,8 @@ struct HeaderBar: View {
     @ObservedObject var claude: ClaudeStore
     let geometry: NotchGeometry
 
+    @State private var logoSpin: Double = 0
+
     var body: some View {
         let wing = (Layout.expandedWidth - (geometry.hasNotch ? geometry.notchSize.width : 0)) / 2 - 20
         HStack(spacing: 0) {
@@ -161,6 +174,12 @@ struct HeaderBar: View {
                     HStack(spacing: 8) {
                         HaluMark(size: 15, color: Theme.primary,
                                  animating: model.tab == .claude && claude.rows.contains { $0.phase == .working })
+                            // Says hello when you point at it.
+                            .rotationEffect(.degrees(logoSpin))
+                            .onHover { inside in
+                                guard inside else { return }
+                                withAnimation(.spring(response: 0.6, dampingFraction: 0.55)) { logoSpin += 360 }
+                            }
                         Text("Halu").font(Theme.title(14)).foregroundStyle(Theme.primary)
                     }
                     .contentShape(Rectangle())

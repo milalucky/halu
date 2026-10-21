@@ -12,9 +12,19 @@ struct GitLabView: View {
         } else {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 6) {
-                    Chip(title: "All", count: store.requests.count, selected: store.filter == nil) { store.filter = nil }
-                    Chip(title: "Mine", count: store.requests.filter { $0.role == .mine }.count, selected: store.filter == .mine) { store.filter = .mine }
-                    Chip(title: "To review", count: store.requests.filter { $0.role == .review }.count, selected: store.filter == .review) { store.filter = .review }
+                    Chip(title: "All", count: store.requests.count, selected: store.filter == nil && !store.showingPipelines) {
+                        store.filter = nil
+                        store.showingPipelines = false
+                    }
+                    Chip(title: "Mine", count: store.requests.filter { $0.role == .mine }.count, selected: store.filter == .mine && !store.showingPipelines) {
+                        store.filter = .mine
+                        store.showingPipelines = false
+                    }
+                    Chip(title: "To review", count: store.requests.filter { $0.role == .review }.count, selected: store.filter == .review && !store.showingPipelines) {
+                        store.filter = .review
+                        store.showingPipelines = false
+                    }
+                    Chip(title: "Pipelines", count: store.pipelines.count, selected: store.showingPipelines) { store.showingPipelines = true }
                     Spacer()
                     if store.newComments > 0 {
                         Text("\(store.newComments) new comment\(store.newComments == 1 ? "" : "s")")
@@ -27,7 +37,18 @@ struct GitLabView: View {
                 if let problem = store.problem {
                     Text(problem).font(Theme.caption(11.5, weight: .regular)).foregroundStyle(Theme.orange)
                 }
-                if store.visible.isEmpty {
+                if store.showingPipelines {
+                    if store.pipelines.isEmpty {
+                        EmptyState(icon: "gearshape.2", title: "No pipelines today", subtitle: "Pipelines you start show up here, with a note from the notch when they finish.")
+                    } else {
+                        ScrollView {
+                            LazyVStack(spacing: 2) {
+                                ForEach(store.pipelines) { PipelineRow(pipeline: $0) }
+                            }
+                        }
+                        .scrollIndicators(.never)
+                    }
+                } else if store.visible.isEmpty {
                     EmptyState(icon: "checkmark.circle", title: "Nothing open", subtitle: "No open merge requests here.")
                 } else {
                     ScrollView {
@@ -66,6 +87,50 @@ private struct Chip: View {
     }
 }
 
+struct PipelineIcon: View {
+    let status: Pipeline.Status
+
+    var body: some View {
+        Image(systemName: status.icon)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(PipelineIcon.tint(status))
+            .symbolEffect(.rotate, options: .repeating, isActive: status == .running)
+    }
+
+    static func tint(_ status: Pipeline.Status) -> Color {
+        switch status {
+        case .success: Theme.green
+        case .failed: Theme.red
+        case .running: Theme.blue
+        case .pending, .created, .preparing, .waiting_for_resource: Theme.orange
+        default: Theme.tertiary
+        }
+    }
+}
+
+private struct PipelineRow: View {
+    let pipeline: Pipeline
+
+    var body: some View {
+        HoverRow { _ in
+            HStack(spacing: 10) {
+                PipelineIcon(status: pipeline.status)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(pipeline.project).font(Theme.body(12.5, weight: .semibold)).foregroundStyle(Theme.primary)
+                    Text(pipeline.ref).font(.system(size: 10.5, design: .monospaced)).foregroundStyle(Theme.tertiary).lineLimit(1)
+                }
+                Spacer()
+                Text(pipeline.status.rawValue.replacingOccurrences(of: "_", with: " "))
+                    .font(Theme.caption(11, weight: .semibold))
+                    .foregroundStyle(PipelineIcon.tint(pipeline.status))
+                Text(Fmt.ago(pipeline.updatedAt)).font(Theme.caption(10.5, weight: .regular)).foregroundStyle(Theme.tertiary)
+            }
+        }
+        .onTapGesture { NSWorkspace.shared.open(pipeline.url) }
+        .help("Open in GitLab")
+    }
+}
+
 private struct MRRow: View {
     let request: MergeRequest
     let comments: [MRComment]
@@ -80,6 +145,7 @@ private struct MRRow: View {
                     .padding(.vertical, 2)
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
+                        if let status = request.pipeline { PipelineIcon(status: status).help("Pipeline: \(status.rawValue)") }
                         if request.isDraft { Text("Draft").font(Theme.caption(10, weight: .bold)).foregroundStyle(Theme.tertiary) }
                         Text(request.title).font(Theme.body(12.5, weight: .semibold)).foregroundStyle(Theme.primary).lineLimit(1)
                         Spacer(minLength: 4)

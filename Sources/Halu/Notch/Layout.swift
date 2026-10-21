@@ -45,7 +45,8 @@ enum Layout {
         case .badge:
             return CGSize(width: g.notchSize.width + flare * 2 + badgeWing * 2, height: g.hasNotch ? g.notchSize.height : 28)
         case .live:
-            return CGSize(width: g.notchSize.width + flare * 2 + liveWing * 2, height: g.hasNotch ? g.notchSize.height : 28)
+            // A little taller than the camera housing, so the glowing line along the bottom shows under it.
+            return CGSize(width: g.notchSize.width + flare * 2 + liveWing * 2, height: g.hasNotch ? g.notchSize.height + 9 : 28)
         case .notice:
             return CGSize(width: noticeWidth, height: noticeTop(g) + 70)
         case .request:

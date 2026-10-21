@@ -127,6 +127,7 @@ final class CalendarStore: ObservableObject {
     /// Opens the call and stops the reminders for it.
     func join(_ meeting: Meeting) {
         joined.insert(meeting.id)
+        Stats.shared.log(.meetingJoined, key: meeting.id)
         if let url = meeting.joinURL { NSWorkspace.shared.open(url) }
     }
 

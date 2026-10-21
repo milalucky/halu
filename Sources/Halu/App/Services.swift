@@ -51,6 +51,9 @@ final class AppModel: ObservableObject {
         didSet { UserDefaults.standard.set(tab.rawValue, forKey: "selectedTab") }
     }
 
+    /// Bumped when a file lands on the notch, for the swallow animation.
+    @Published var gulps = 0
+
     /// Tabs turned off in Settings; everything is on by default.
     @Published private(set) var disabledTabs: Set<Tab>
 
@@ -127,6 +130,30 @@ final class Services {
         return nil
     }
 
+    /// On Monday from 9:00, once: a note from the notch that last week's recap is ready.
+    private func scheduleWeeklyRecap() {
+        let timer = Timer(timeInterval: 600, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.offerRecap() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 20) { [weak self] in self?.offerRecap() }
+    }
+
+    private func offerRecap() {
+        let now = Date()
+        let calendar = Calendar.current
+        guard calendar.component(.weekday, from: now) == 2, calendar.component(.hour, from: now) >= 9 else { return }
+        let week = WeekRecap.weekStart(now)
+        guard (UserDefaults.standard.object(forKey: "recap.shown") as? Date).map({ $0 < week }) ?? true else { return }
+        UserDefaults.standard.set(now, forKey: "recap.shown")
+        let last = calendar.date(byAdding: .day, value: -7, to: week)!
+        let recap = WeekRecap.make(for: last..<week, tasks: tasks.items)
+        tasks.showingRecap = true
+        notices.post(Notice(icon: "chart.bar.fill", tint: Theme.accent, title: "Your week",
+                            subtitle: "\(recap.tasksDone) tasks done · \(recap.meetings) meetings · \(Int(recap.focusMinutes / 60))h in focus",
+                            action: .open(.tasks), actionTitle: "See it", tab: .tasks, duration: 30, sound: "Glass"))
+    }
+
     func start() {
         let model = model
         calendar.isActive = { model.isEnabled(.calendar) }
@@ -136,7 +163,8 @@ final class Services {
         media.isActive = { model.isEnabled(.media) }
         messages.isActive = { model.isEnabled(.messages) }
         shelf.isActive = { model.isEnabled(.clipboard) }
-        pomodoro.onFinish = { [notices] phase in
+        pomodoro.onFinish = { [notices, pomodoro] phase in
+            if phase == .focus { Stats.shared.log(.focus, value: pomodoro.total / 60) }
             notices.post(phase == .focus
                 ? Notice(icon: "cup.and.saucer.fill", tint: Theme.green, title: "Focus done",
                          subtitle: "Take a 5-minute break; it has started.", action: nil, actionTitle: nil,
@@ -146,6 +174,7 @@ final class Services {
                          tab: .tasks, duration: 12, sound: "Glass"))
         }
         live.start()
+        scheduleWeeklyRecap()
         claudeRequests.start()
         weather.start()
         calendar.onReminder = { [notices] meeting, reminder in
@@ -174,6 +203,14 @@ final class Services {
         messages.start()
         vpn.start()
         gitlab.isActive = { model.isEnabled(.gitlab) }
+        gitlab.onPipelineFinished = { [notices] pipeline in
+            Stats.shared.log(.pipeline, key: String(pipeline.id))
+            let ok = pipeline.status == .success
+            notices.post(Notice(icon: ok ? "checkmark.circle.fill" : "xmark.circle.fill", tint: ok ? Theme.green : Theme.red,
+                                title: ok ? "Pipeline passed" : "Pipeline \(pipeline.status.rawValue)",
+                                subtitle: "\(pipeline.project) · \(pipeline.ref)", action: .open(.gitlab), actionTitle: "Open",
+                                tab: .gitlab, duration: ok ? 8 : 20, sound: ok ? "Glass" : "Basso"))
+        }
         gitlab.start()
         awake.restore()
     }

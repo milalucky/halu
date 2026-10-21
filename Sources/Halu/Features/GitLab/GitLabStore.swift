@@ -16,6 +16,32 @@ struct MergeRequest: Identifiable, Equatable {
     var unresolved: Bool
     var role: Role
     var conflicts: Bool
+    var pipeline: Pipeline.Status?
+}
+
+/// A CI pipeline: its project, branch and how it's going.
+struct Pipeline: Identifiable, Equatable {
+    enum Status: String {
+        case created, waiting_for_resource, preparing, pending, running, success, failed, canceled, skipped, manual, scheduled
+
+        var isActive: Bool { [.created, .waiting_for_resource, .preparing, .pending, .running].contains(self) }
+        var icon: String {
+            switch self {
+            case .success: "checkmark.circle.fill"
+            case .failed: "xmark.circle.fill"
+            case .canceled, .skipped: "slash.circle"
+            case .manual, .scheduled: "hand.raised.circle"
+            default: "circle.dotted.circle"
+            }
+        }
+    }
+
+    var id: Int
+    var project: String
+    var ref: String
+    var status: Status
+    var url: URL
+    var updatedAt: Date
 }
 
 /// A comment someone else left on a merge request since you last opened it.
@@ -41,6 +67,11 @@ final class GitLabStore: ObservableObject {
     @Published private(set) var problem: String?
     @Published private(set) var isLoading = false
     @Published var filter: MergeRequest.Role? = nil
+    /// Pipelines you started in the last day, newest first.
+    @Published private(set) var pipelines: [Pipeline] = []
+    @Published var showingPipelines = false
+    /// Called when one of your pipelines finishes.
+    var onPipelineFinished: (Pipeline) -> Void = { _ in }
 
     @Published var draftServer = UserDefaults.standard.string(forKey: "gitlab.server") ?? ""
     @Published var draftToken = ""
@@ -52,6 +83,9 @@ final class GitLabStore: ObservableObject {
     /// Comment counts at the last look, to fetch comments only where the count moved.
     private var noteCounts: [Int: Int] = [:]
     private var timer: Timer?
+    private var username = UserDefaults.standard.string(forKey: "gitlab.username")
+    /// Pipeline status per merge request, with the update time it was read at.
+    private var mrPipelines: [Int: (Date, Pipeline.Status?)] = [:]
 
     var isConnected: Bool { !server.isEmpty && userName != nil }
     var newComments: Int { comments.values.reduce(0) { $0 + $1.count } }
@@ -123,10 +157,14 @@ final class GitLabStore: ObservableObject {
             do {
                 let mine = try await Self.requests(server, "merge_requests?scope=created_by_me&state=opened&per_page=50", role: .mine, token: token)
                 let review = try await Self.requests(server, "merge_requests?scope=all&reviewer_id=\(userID)&state=opened&per_page=50", role: .review, token: token)
-                let all = (mine + review.filter { r in !mine.contains { $0.id == r.id } }).sorted { $0.updatedAt > $1.updatedAt }
+                var all = (mine + review.filter { r in !mine.contains { $0.id == r.id } }).sorted { $0.updatedAt > $1.updatedAt }
+                for index in all.indices {
+                    all[index].pipeline = await pipelineStatus(of: all[index], token: token)
+                }
                 requests = all
                 problem = nil
                 await loadComments(all, token: token)
+                await loadPipelines(token: token)
             } catch {
                 problem = error.localizedDescription
             }
@@ -156,6 +194,45 @@ final class GitLabStore: ObservableObject {
         }
         UserDefaults.standard.set(seen, forKey: "gitlab.seen")
         if fresh != comments { comments = fresh }
+    }
+
+    /// The latest pipeline of a merge request, read again only when the merge request changed.
+    private func pipelineStatus(of request: MergeRequest, token: String) async -> Pipeline.Status? {
+        if let cached = mrPipelines[request.id], cached.0 == request.updatedAt, !(cached.1?.isActive ?? false) { return cached.1 }
+        let rows = try? await Self.get("\(server)/api/v4/projects/\(request.projectID)/merge_requests/\(request.iid)/pipelines?per_page=1", token: token) as? [[String: Any]]
+        let status = (rows?.first?["status"] as? String).flatMap(Pipeline.Status.init(rawValue:))
+        mrPipelines[request.id] = (request.updatedAt, status)
+        return status
+    }
+
+    /// Your pipelines from the last day, across projects you were active in.
+    private func loadPipelines(token: String) async {
+        if username == nil, let me = try? await Self.get("\(server)/api/v4/user", token: token) as? [String: Any] {
+            username = me["username"] as? String
+            UserDefaults.standard.set(username, forKey: "gitlab.username")
+        }
+        guard let username else { return }
+        let since = ISO8601DateFormatter().string(from: Date().addingTimeInterval(-3 * 86400))
+        guard let projects = try? await Self.get("\(server)/api/v4/projects?membership=true&simple=true&order_by=last_activity_at&per_page=15&last_activity_after=\(since)", token: token) as? [[String: Any]] else { return }
+        let dayAgo = ISO8601DateFormatter().string(from: Date().addingTimeInterval(-86400))
+        var found: [Pipeline] = []
+        for project in projects {
+            guard let id = project["id"] as? Int else { continue }
+            let name = project["path_with_namespace"] as? String ?? project["name"] as? String ?? ""
+            guard let rows = try? await Self.get("\(server)/api/v4/projects/\(id)/pipelines?username=\(username)&per_page=10&updated_after=\(dayAgo)", token: token) as? [[String: Any]] else { continue }
+            for row in rows {
+                guard let pid = row["id"] as? Int, let status = (row["status"] as? String).flatMap(Pipeline.Status.init(rawValue:)),
+                      let url = (row["web_url"] as? String).flatMap(URL.init(string:)) else { continue }
+                found.append(Pipeline(id: pid, project: name.split(separator: "/").last.map(String.init) ?? name, ref: row["ref"] as? String ?? "",
+                                      status: status, url: url, updatedAt: (row["updated_at"] as? String).flatMap(Self.date) ?? .distantPast))
+            }
+        }
+        found.sort { $0.updatedAt > $1.updatedAt }
+        // Tell about pipelines that were running last time and have finished now.
+        for pipeline in found where !pipeline.status.isActive {
+            if pipelines.first(where: { $0.id == pipeline.id })?.status.isActive == true { onPipelineFinished(pipeline) }
+        }
+        pipelines = found
     }
 
     // MARK: API

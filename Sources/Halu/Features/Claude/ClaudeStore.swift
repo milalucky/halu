@@ -129,6 +129,7 @@ final class ClaudeStore: ObservableObject {
         }
 
         for session in loaded {
+            Stats.shared.log(.claudeSession, date: session.startedAt, key: session.id)
             let previous = known[session.id]
             known[session.id] = session.status
             guard loadedOnce, previous != session.status else { continue }

@@ -30,6 +30,8 @@ final class TaskStore: ObservableObject {
     @Published private(set) var items: [TaskItem]
     /// The new-task field, kept here so it survives the panel closing.
     @Published var draft = ""
+    /// The weekly recap is open in the Tasks tab.
+    @Published var showingRecap = false
     /// Tags picked for the task being written.
     @Published var draftTags: [String] = []
     /// Show only tasks with this tag (nil = all); new tasks get it too.

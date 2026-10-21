@@ -118,6 +118,7 @@ struct NoticeView: View {
     let top: CGFloat
     let notices: NoticeCenter
     let actions: PanelActions
+    @State private var appeared = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -128,6 +129,7 @@ struct NoticeView: View {
                     Image(systemName: notice.icon)
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(notice.tint)
+                        .symbolEffect(.bounce, value: appeared)
                 }
                 .frame(width: 34, height: 34)
 
@@ -154,6 +156,9 @@ struct NoticeView: View {
             .frame(maxHeight: .infinity)
         }
         .contentShape(Rectangle())
+        .offset(y: appeared ? 0 : -14)
+        .opacity(appeared ? 1 : 0)
+        .onAppear { withAnimation(.spring(response: 0.45, dampingFraction: 0.6).delay(0.05)) { appeared = true } }
         .onTapGesture {
             notices.dismiss()
             actions.open(notice.tab)

@@ -7,7 +7,10 @@ struct TasksView: View {
     @State private var checking: Set<UUID> = []
 
     var body: some View {
-        if showingDone {
+        if store.showingRecap {
+            RecapView(tasks: store.items) { store.showingRecap = false }
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+        } else if showingDone {
             DoneTasksView(store: store) { showingDone = false }
                 .transition(.move(edge: .trailing).combined(with: .opacity))
         } else {
@@ -21,6 +24,9 @@ struct TasksView: View {
             HStack {
                 SectionHeader(title: "To do", detail: open.isEmpty ? nil : "\(open.count) left")
                 if !store.tags.isEmpty { TagFilterMenu(store: store) }
+                IconButton(icon: "chart.bar.fill", help: "Your week") {
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.9)) { store.showingRecap = true }
+                }
             }
             InputField(placeholder: "Add a task or dictate it · #DTM adds a tag", text: $store.draft, speech: speech) {
                 speech.stop()
@@ -213,6 +219,9 @@ private struct TaskRow: View {
                         }
                     }
                     .frame(width: 17, height: 17)
+                    .overlay { if checked { Burst(tint: Theme.accent) } }
+                    .scaleEffect(checked ? 1.15 : 1)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.45), value: checked)
                     .contentShape(Circle())
                 }
                 .buttonStyle(.plain)

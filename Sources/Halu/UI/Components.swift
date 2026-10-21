@@ -60,10 +60,27 @@ struct PillButton: View {
             .padding(.horizontal, 11)
             .padding(.vertical, 5)
             .foregroundStyle(prominent ? Color.black.opacity(0.85) : tint)
-            .background(Capsule().fill(prominent ? tint.opacity(hovering ? 1 : 0.9) : tint.opacity(hovering ? 0.22 : 0.14)))
+            .modifier(PillBackground(prominent: prominent, tint: tint, hovering: hovering))
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
+        .scaleEffect(hovering ? 1.04 : 1)
+        .animation(.spring(response: 0.25, dampingFraction: 0.6), value: hovering)
+    }
+}
+
+/// Solid for the main action, Liquid Glass for the rest.
+private struct PillBackground: ViewModifier {
+    let prominent: Bool
+    let tint: Color
+    let hovering: Bool
+
+    func body(content: Content) -> some View {
+        if prominent {
+            content.background(Capsule().fill(tint.opacity(hovering ? 1 : 0.9)))
+        } else {
+            content.glass(Capsule(), tint: tint, interactive: true)
+        }
     }
 }
 
