@@ -97,6 +97,7 @@ struct TabContent: View {
         case .calendar: CalendarView(store: services.calendar)
         case .claude: ClaudeView(store: services.claude)
         case .chat: ChatView(store: services.chat)
+        case .weather: WeatherView(weather: services.weather)
         case .clipboard: ClipboardTab(clipboard: services.clipboard, shelf: services.shelf)
         case .translate: TranslateView(store: services.translate, speech: services.speech)
         case .tools: ToolsView(store: services.tools, compare: services.compare, screen: services.screenTools)
@@ -154,7 +155,7 @@ struct ExpandedView: View {
     }
 }
 
-/// Left wing: the current tab's name. Right wing: Keep Awake, date and time.
+/// Left wing: Halu, the current tab, weather and time. Right wing: Claude usage, speed and quick buttons.
 struct HeaderBar: View {
     @ObservedObject var model: AppModel
     @ObservedObject var awake: AwakeController
@@ -194,8 +195,14 @@ struct HeaderBar: View {
                     .lineLimit(1)
                     .layoutPriority(-1)
                 Spacer(minLength: 4)
-                WeatherPill(weather: Services.shared.weather)
-                ClaudeUsagePill(requests: Services.shared.claudeRequests)
+                WeatherPill(weather: Services.shared.weather, model: model)
+                TimelineView(.periodic(from: .now, by: 15)) { context in
+                    Text(Fmt.time.string(from: context.date)).monospacedDigit()
+                        .font(Theme.caption(12, weight: .medium))
+                        .foregroundStyle(Theme.secondary)
+                        .fixedSize()
+                        .help(Fmt.day.string(from: context.date))
+                }
             }
             .frame(width: wing, alignment: .leading)
                 .padding(.leading, 22)
@@ -203,20 +210,12 @@ struct HeaderBar: View {
             Spacer(minLength: 0)
 
             HStack(spacing: 6) {
+                ClaudeUsagePill(requests: Services.shared.claudeRequests)
                 SpeedLabel(speed: speed)
                 ChatButton(model: model)
                 PomodoroButton(pomodoro: Services.shared.pomodoro)
                 VPNButton(vpn: vpn)
                 AwakeButton(awake: awake)
-                TimelineView(.periodic(from: .now, by: 15)) { context in
-                    // Time only: the header is narrow, and the date is in the tooltip.
-                    Text(Fmt.time.string(from: context.date)).monospacedDigit()
-                        .help(Fmt.day.string(from: context.date))
-                    .font(Theme.caption(12, weight: .medium))
-                    .foregroundStyle(Theme.secondary)
-                    .lineLimit(1)
-                    .fixedSize()
-                }
             }
             .frame(width: wing, alignment: .trailing)
             .padding(.trailing, 20)
@@ -236,8 +235,8 @@ struct Sidebar: View {
 
     /// Media only shows up while something plays or sits paused.
     private var tabs: [Tab] {
-        Tab.allCases.filter { tab in
-            guard tab != .settings, tab != .chat, model.isEnabled(tab) else { return false }
+        model.order.filter { tab in
+            guard tab != .settings, tab != .chat, tab != .weather, model.isEnabled(tab) else { return false }
             return tab != .media || media.source != nil || model.tab == .media
         }
     }

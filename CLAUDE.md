@@ -51,6 +51,8 @@ Live notch (LiveCenter / LiveView, Display.live): a meeting within 15 min (or st
 
 Answering Claude from the notch: halu-hook writes PermissionRequest / AskUserQuestion requests to Application Support/Halu/claude-requests and waits (≤110 s, hook timeout 120) for Halu's answer file; it only waits while Halu's heartbeat file is fresh; "Answer in terminal" or no answer = silent exit (normal prompt). Plan usage comes from the status line (`halu-hook statusline`, rate_limits) into claude-usage.json, shown as a pill in the header's left wing with the weather (Open-Meteo, CoreLocation or a city in Settings). GitLab shows MR pipeline status and your own pipelines of the last day, with a notice when one finishes. Weekly recap (Tasks → chart button; a notice on Monday from 9:00) uses a local Stats log (focus, Claude sessions, meetings joined, pipelines) plus tasks and EventKit. Liquid Glass via `.glass(...)` (macOS 26, falls back to a card fill). The live notch is 9 pt taller than the camera housing so its bottom line shows.
 
+Header: left = Halu, tab title (truncates), weather pill (click opens the hidden Weather tab: hourly + 7-day forecast, Apple-Weather look; WeatherKit would need a paid developer account, so data is Open-Meteo) and the time; right = Claude usage, speed, Chat, Pomodoro, VPN, Keep Awake. The live line continues through the notch's top flares to the screen edge. Settings lets you reorder tabs (drag or arrows; AppModel.order, "tabOrder").
+
 Tabs are configurable in Settings (gear): all on by default; a disabled tab hides from the sidebar, pauses its store's background work (`isActive`), and drops its notch indicators.
 
 ## Roadmap

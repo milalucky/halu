@@ -10,10 +10,10 @@ struct IntegrationsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                SectionHeader(title: "Tabs", detail: "Turned-off tabs disappear and stop working in the background")
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                    ForEach(AppModel.configurable) { tab in
-                        TabToggle(tab: tab, model: model)
+                SectionHeader(title: "Tabs", detail: "Drag or use the arrows to reorder · turned-off tabs stop working in the background")
+                VStack(spacing: 3) {
+                    ForEach(Array(model.order.enumerated()), id: \.element) { index, tab in
+                        TabRow(tab: tab, model: model, isFirst: index == 0, isLast: index == model.order.count - 1)
                     }
                 }
                 SectionHeader(title: "Integrations", detail: "Jira's token stays in your Keychain; the rest is read from open tabs")
@@ -30,21 +30,40 @@ struct IntegrationsView: View {
     }
 }
 
-private struct TabToggle: View {
+/// One tab in Settings: drag handle, icon, name, arrows to move it, and its switch.
+private struct TabRow: View {
     let tab: Tab
     @ObservedObject var model: AppModel
+    let isFirst: Bool
+    let isLast: Bool
+    @State private var hovering = false
+    @State private var targeted = false
 
     var body: some View {
         let enabled = model.isEnabled(tab)
         HStack(spacing: 10) {
-            Image(systemName: tab.icon)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(enabled ? Theme.primary : Theme.tertiary)
-                .frame(width: 18)
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(Theme.tertiary)
+            Group {
+                if tab == .claude {
+                    ClaudeMark().stroke(style: StrokeStyle(lineWidth: 1.5, lineCap: .round)).frame(width: 13, height: 13)
+                } else {
+                    Image(systemName: tab.icon).font(.system(size: 12, weight: .semibold))
+                }
+            }
+            .foregroundStyle(enabled ? Theme.primary : Theme.tertiary)
+            .frame(width: 18)
             Text(tab.title)
                 .font(Theme.body(12.5, weight: .medium))
                 .foregroundStyle(enabled ? Theme.primary : Theme.tertiary)
             Spacer()
+            if hovering {
+                IconButton(icon: "chevron.up", help: "Move up", size: 9) { withAnimation(.spring(response: 0.3)) { model.move(tab, by: -1) } }
+                    .opacity(isFirst ? 0.25 : 1).disabled(isFirst)
+                IconButton(icon: "chevron.down", help: "Move down", size: 9) { withAnimation(.spring(response: 0.3)) { model.move(tab, by: 1) } }
+                    .opacity(isLast ? 0.25 : 1).disabled(isLast)
+            }
             Toggle("", isOn: Binding(get: { enabled }, set: { model.setEnabled(tab, $0) }))
                 .toggleStyle(.switch)
                 .controlSize(.mini)
@@ -52,8 +71,18 @@ private struct TabToggle: View {
                 .tint(Theme.accent)
         }
         .padding(.horizontal, 12)
-        .frame(height: 36)
-        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.card))
+        .frame(height: 32)
+        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(targeted ? Theme.cardHover : Theme.card))
+        .overlay(alignment: .top) {
+            if targeted { Capsule().fill(Theme.accent).frame(height: 2).offset(y: -2) }
+        }
+        .onHover { hovering = $0 }
+        .draggable(tab.rawValue)
+        .dropDestination(for: String.self) { items, _ in
+            guard let raw = items.first, let dragged = Tab(rawValue: raw) else { return false }
+            withAnimation(.spring(response: 0.3)) { model.move(dragged, to: tab) }
+            return true
+        } isTargeted: { targeted = $0 }
     }
 }
 

@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 enum Tab: String, CaseIterable, Identifiable {
-    case tasks, calendar, claude, chat, jira, gitlab, messages, clipboard, translate, tools, accounts, notes, media, settings
+    case tasks, calendar, claude, chat, weather, jira, gitlab, messages, clipboard, translate, tools, accounts, notes, media, settings
 
     var id: String { rawValue }
 
@@ -12,6 +12,7 @@ enum Tab: String, CaseIterable, Identifiable {
         case .calendar: "Calendar"
         case .claude: "Claude"
         case .chat: "Chat"
+        case .weather: "Weather"
         case .clipboard: "Clipboard"
         case .translate: "Translate"
         case .tools: "Tools"
@@ -31,6 +32,7 @@ enum Tab: String, CaseIterable, Identifiable {
         case .calendar: "calendar"
         case .claude: "sparkle"
         case .chat: "bubble.left.circle"
+        case .weather: "cloud.sun"
         case .clipboard: "doc.on.clipboard"
         case .translate: "character.bubble"
         case .tools: "wrench.and.screwdriver"
@@ -56,6 +58,8 @@ final class AppModel: ObservableObject {
 
     /// Tabs turned off in Settings; everything is on by default.
     @Published private(set) var disabledTabs: Set<Tab>
+    /// The sidebar's order, as arranged in Settings; tabs added in later versions go at the end.
+    @Published private(set) var order: [Tab]
 
     init() {
         // Compare used to be its own tab; it lives in Tools now.
@@ -63,13 +67,30 @@ final class AppModel: ObservableObject {
         // Shelf is a mode of Clipboard now, and Compare of Tools.
         tab = saved == "compare" ? .tools : saved == "shelf" ? .clipboard : saved.flatMap(Tab.init(rawValue:)) ?? .tasks
         disabledTabs = Set((UserDefaults.standard.stringArray(forKey: "disabledTabs") ?? []).compactMap(Tab.init(rawValue:)))
+        let arranged = (UserDefaults.standard.stringArray(forKey: "tabOrder") ?? []).compactMap(Tab.init(rawValue:)).filter(Self.configurable.contains)
+        order = arranged + Self.configurable.filter { !arranged.contains($0) }
     }
 
     /// Tabs that can be turned off (Settings itself can't).
     /// Chat opens from its header button, not the sidebar.
-    static let configurable = Tab.allCases.filter { $0 != .settings && $0 != .chat }
+    static let configurable = Tab.allCases.filter { $0 != .settings && $0 != .chat && $0 != .weather }
 
     func isEnabled(_ tab: Tab) -> Bool { !disabledTabs.contains(tab) }
+
+    /// Moves a tab up (-1) or down (+1) in the sidebar.
+    func move(_ tab: Tab, by step: Int) {
+        guard let index = order.firstIndex(of: tab), order.indices.contains(index + step) else { return }
+        order.swapAt(index, index + step)
+        UserDefaults.standard.set(order.map(\.rawValue), forKey: "tabOrder")
+    }
+
+    /// Puts `tab` where `target` is (drag and drop in Settings).
+    func move(_ tab: Tab, to target: Tab) {
+        guard tab != target, let from = order.firstIndex(of: tab), let to = order.firstIndex(of: target) else { return }
+        order.remove(at: from)
+        order.insert(tab, at: to)
+        UserDefaults.standard.set(order.map(\.rawValue), forKey: "tabOrder")
+    }
 
     func setEnabled(_ tab: Tab, _ enabled: Bool) {
         guard tab != .settings else { return }

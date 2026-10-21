@@ -35,7 +35,8 @@ struct NotchShape: Shape {
     }
 }
 
-/// One half of the notch's visible edge, from the middle of the bottom up to the top of one side,
+/// One half of the notch's visible edge, from the middle of the bottom up one side and out along the
+/// top flare,
 /// inset so a stroke sits fully inside. Two halves trimmed together make a line that drains toward
 /// the bottom centre as time runs out.
 struct NotchEdge: Shape {
@@ -54,7 +55,9 @@ struct NotchEdge: Shape {
         path.move(to: CGPoint(x: rect.midX, y: rect.maxY))
         path.addLine(to: CGPoint(x: corner, y: rect.maxY))
         path.addQuadCurve(to: CGPoint(x: side, y: rect.maxY - bottom), control: CGPoint(x: side, y: rect.maxY))
-        path.addLine(to: CGPoint(x: side, y: rect.minY))
+        path.addLine(to: CGPoint(x: side, y: rect.minY + top))
+        // On through the top flare, out to the screen edge.
+        path.addQuadCurve(to: CGPoint(x: leading ? rect.minX : rect.maxX, y: rect.minY), control: CGPoint(x: side, y: rect.minY))
         return path
     }
 }
