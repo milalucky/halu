@@ -122,10 +122,14 @@ final class VPNController: ObservableObject {
               let rows = try? JSONSerialization.jsonObject(with: Data(output.utf8)) as? [[String: Any]] else { return [] }
         return rows.compactMap { row -> Connection? in
             guard let id = row["id"] as? String else { return nil }
-            let status = ((row["status"] ?? row["state"]) as? String ?? "").lowercased()
-            let state: Connection.State = status.contains("connecting") ? .connecting
-                : (status.contains("active") || status.contains("connected")) && !status.contains("inactive") ? .on : .off
-            return Connection(id: id, name: row["name"] as? String ?? id, provider: "Pritunl", kind: .pritunl, state: state)
+            // `connected` is the tunnel; `run_state` "Active" without it means still connecting.
+            let connected = row["connected"] as? Bool ?? false
+            let running = (row["run_state"] as? String ?? "").lowercased() == "active"
+            let state: Connection.State = connected ? .on : running ? .connecting : .off
+            // "m.zharkevich (MSK)" → "MSK": the server is what tells profiles apart.
+            var name = row["name"] as? String ?? id
+            if let open = name.lastIndex(of: "("), name.hasSuffix(")") { name = String(name[name.index(after: open)..<name.index(before: name.endIndex)]) }
+            return Connection(id: id, name: name, provider: "Pritunl", kind: .pritunl, state: state)
         }
     }
 
