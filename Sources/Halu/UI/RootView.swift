@@ -4,6 +4,7 @@ struct RootView: View {
     @ObservedObject var state: PanelState
     @ObservedObject var model: AppModel
     @ObservedObject var notices: NoticeCenter
+    @ObservedObject var live: LiveCenter
     @ObservedObject var claude: ClaudeStore
     @ObservedObject var messages: MessagesStore
     let services: Services
@@ -13,7 +14,7 @@ struct RootView: View {
     private var unread: Int { model.isEnabled(.messages) ? messages.unseen : 0 }
 
     private var display: Display {
-        Layout.display(expanded: state.isExpanded, hasNotice: notices.current != nil,
+        Layout.display(expanded: state.isExpanded, hasNotice: notices.current != nil, live: live.activity != nil,
                        attention: claudeWaiting + unread, hasNotch: state.geometry.hasNotch)
     }
 
@@ -56,6 +57,13 @@ struct RootView: View {
                 actions.open(services.attentionTab)
             }
                 .transition(.opacity)
+        case .live:
+            if let activity = live.activity {
+                LiveView(activity: activity, attention: claudeWaiting + unread > 0, pomodoro: services.pomodoro,
+                         shape: NotchShape(topRadius: Layout.radii(.live).top, bottomRadius: Layout.radii(.live).bottom),
+                         calendar: services.calendar)
+                    .transition(.opacity)
+            }
         case .notch, .hidden:
             Color.clear
         }
@@ -167,13 +175,13 @@ struct HeaderBar: View {
             HStack(spacing: 6) {
                 SpeedLabel(speed: speed)
                 ChatButton(model: model)
+                PomodoroButton(pomodoro: Services.shared.pomodoro)
                 VPNButton(vpn: vpn)
                 AwakeButton(awake: awake)
                 TimelineView(.periodic(from: .now, by: 15)) { context in
-                    HStack(spacing: 6) {
-                        Text(Fmt.headerDate.string(from: context.date))
-                        Text(Fmt.time.string(from: context.date)).monospacedDigit()
-                    }
+                    // Time only: the header is narrow, and the date is in the tooltip.
+                    Text(Fmt.time.string(from: context.date)).monospacedDigit()
+                        .help(Fmt.day.string(from: context.date))
                     .font(Theme.caption(12, weight: .medium))
                     .foregroundStyle(Theme.secondary)
                     .lineLimit(1)

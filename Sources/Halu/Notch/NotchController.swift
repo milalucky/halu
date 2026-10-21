@@ -82,7 +82,7 @@ final class NotchController {
             guard let self, let panel else { return }
             self.collapse(panel)
         }
-        let root = RootView(state: panel.state, model: services.model, notices: services.notices,
+        let root = RootView(state: panel.state, model: services.model, notices: services.notices, live: services.live,
                             claude: services.claude, messages: services.messages, services: services, actions: panel.actions)
         let host = FirstMouseHostingView(rootView: root)
         host.sizingOptions = []
@@ -101,7 +101,7 @@ final class NotchController {
 
     private func display(of panel: ScreenPanel) -> Display {
         Layout.display(expanded: panel.state.isExpanded, hasNotice: services.notices.current != nil,
-                       attention: services.attentionCount, hasNotch: panel.state.geometry.hasNotch)
+                       live: services.live.activity != nil, attention: services.attentionCount, hasNotch: panel.state.geometry.hasNotch)
     }
 
     private func expand(_ panel: ScreenPanel, tab: Tab?) {
@@ -160,7 +160,7 @@ final class NotchController {
                     if now.timeIntervalSince(since) >= leaveDelay { collapse(panel) }
                 }
             } else if current != .notice {
-                let triggerWidth = current == .badge ? Layout.size(.badge, g).width : nil
+                let triggerWidth = current == .badge || current == .live ? Layout.size(current, g).width : nil
                 if g.isInTrigger(point, width: triggerWidth) {
                     if isFileDrag {
                         // Files dragged to the notch go to the Shelf, unless Compare is open and waiting for them.
@@ -175,8 +175,9 @@ final class NotchController {
                         panel.hoverSince = since
                         // Hovering the indicators opens straight to what they point at.
                         if now.timeIntervalSince(since) >= hoverDelay {
-                            // Opens where you left off; a click on the mark goes to what's waiting.
-                            expand(panel, tab: nil)
+                            // Opens where you left off; a click on the mark goes to what's waiting. A meeting
+                            // about to start opens the calendar, where Join is.
+                            if case .meeting = services.live.activity { expand(panel, tab: .calendar) } else { expand(panel, tab: nil) }
                         }
                     }
                 } else {

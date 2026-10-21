@@ -2,9 +2,9 @@ import SwiftUI
 
 /// What a display's panel is showing right now.
 enum Display: Equatable {
-    case hidden, notch, badge, notice, expanded
+    case hidden, notch, badge, live, notice, expanded
 
-    var isInteractive: Bool { self == .badge || self == .notice || self == .expanded }
+    var isInteractive: Bool { self != .hidden && self != .notch }
 }
 
 enum Layout {
@@ -16,10 +16,13 @@ enum Layout {
     static let flare: CGFloat = 8
     /// Width of each side of the collapsed notch when it carries indicators.
     static let badgeWing: CGFloat = 30
+    /// Width of each side while a meeting countdown or timer is live.
+    static let liveWing: CGFloat = 58
 
-    static func display(expanded: Bool, hasNotice: Bool, attention: Int, hasNotch: Bool) -> Display {
+    static func display(expanded: Bool, hasNotice: Bool, live: Bool, attention: Int, hasNotch: Bool) -> Display {
         if expanded { return .expanded }
         if hasNotice { return .notice }
+        if live { return .live }
         if attention > 0 { return .badge }
         return hasNotch ? .notch : .hidden
     }
@@ -40,6 +43,8 @@ enum Layout {
             return CGSize(width: g.notchSize.width + flare * 2, height: g.notchSize.height)
         case .badge:
             return CGSize(width: g.notchSize.width + flare * 2 + badgeWing * 2, height: g.hasNotch ? g.notchSize.height : 28)
+        case .live:
+            return CGSize(width: g.notchSize.width + flare * 2 + liveWing * 2, height: g.hasNotch ? g.notchSize.height : 28)
         case .notice:
             return CGSize(width: noticeWidth, height: noticeTop(g) + 70)
         case .expanded:
@@ -51,7 +56,7 @@ enum Layout {
         switch display {
         case .expanded: (flare, 28)
         case .notice: (flare, 24)
-        case .badge: (flare, 14)
+        case .badge, .live: (flare, 14)
         case .notch, .hidden: (flare, 12)
         }
     }

@@ -110,10 +110,10 @@ private struct MeetingRow: View {
                         .font(Theme.caption(11, weight: .semibold))
                         .foregroundStyle(isLive ? Theme.green : (highlighted ? Theme.accent : Theme.tertiary))
                 }
-                if let url = meeting.joinURL, !isPast {
+                if meeting.joinURL != nil, !isPast {
                     PillButton(title: "Join", icon: "video.fill", tint: isLive ? Theme.green : Theme.accent,
                                prominent: isLive || highlighted) {
-                        NSWorkspace.shared.open(url)
+                        Services.shared.calendar.join(meeting)
                     }
                 }
             }

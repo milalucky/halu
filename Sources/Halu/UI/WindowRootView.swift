@@ -15,6 +15,7 @@ struct WindowRootView: View {
                 Spacer()
                 SpeedLabel(speed: services.speed)
                 ChatButton(model: model)
+                PomodoroButton(pomodoro: services.pomodoro)
                 VPNButton(vpn: services.vpn)
                 AwakeButton(awake: services.awake)
             }

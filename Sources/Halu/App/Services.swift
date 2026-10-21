@@ -110,6 +110,8 @@ final class Services {
     var openWindow: () -> Void = {}
     let vpn = VPNController()
     let speed = NetworkSpeed()
+    let pomodoro = PomodoroTimer()
+    lazy var live = LiveCenter(calendar: calendar, pomodoro: pomodoro)
 
     /// Something waiting for the user, shown on the collapsed notch: Claude first, then unread messages.
     var claudeWaiting: Int { model.isEnabled(.claude) ? claude.attention.count : 0 }
@@ -131,8 +133,18 @@ final class Services {
         media.isActive = { model.isEnabled(.media) }
         messages.isActive = { model.isEnabled(.messages) }
         shelf.isActive = { model.isEnabled(.clipboard) }
-        calendar.onReminder = { [notices] meeting, startsNow in
-            notices.post(.meeting(meeting, startsNow: startsNow))
+        pomodoro.onFinish = { [notices] phase in
+            notices.post(phase == .focus
+                ? Notice(icon: "cup.and.saucer.fill", tint: Theme.green, title: "Focus done",
+                         subtitle: "Take a 5-minute break; it has started.", action: nil, actionTitle: nil,
+                         tab: .tasks, duration: 12, sound: "Glass")
+                : Notice(icon: "flame.fill", tint: Theme.orange, title: "Break's over",
+                         subtitle: "Start another focus round from the timer.", action: nil, actionTitle: nil,
+                         tab: .tasks, duration: 12, sound: "Glass"))
+        }
+        live.start()
+        calendar.onReminder = { [notices] meeting, reminder in
+            notices.post(.meeting(meeting, reminder))
         }
         claude.onTransition = { [notices] session in
             switch session.status {

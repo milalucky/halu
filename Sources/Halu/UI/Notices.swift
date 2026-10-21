@@ -20,15 +20,23 @@ struct Notice: Identifiable, Equatable {
     var duration: TimeInterval
     var sound: String?
 
-    static func meeting(_ meeting: Meeting, startsNow: Bool) -> Notice {
-        let when = startsNow ? "Starting now" : "Starts \(Fmt.until(meeting.start))"
+    static func meeting(_ meeting: Meeting, _ reminder: CalendarStore.Reminder) -> Notice {
+        let when: String
+        let tint: Color
+        switch reminder {
+        case .soon: (when, tint) = ("Starts \(Fmt.until(meeting.start))", Theme.accent)
+        case .oneMinute: (when, tint) = ("Starts in a minute", Theme.orange)
+        case .started: (when, tint) = ("Starting now", Theme.green)
+        case .stillGoing: (when, tint) = ("Already going for \(Int(-meeting.start.timeIntervalSinceNow / 60)) min", Theme.red)
+        }
         return Notice(
-            icon: "calendar", tint: Theme.accent,
+            icon: reminder == .stillGoing ? "exclamationmark.circle.fill" : "video.fill", tint: tint,
             title: meeting.title,
             subtitle: "\(when) · \(Fmt.time.string(from: meeting.start))–\(Fmt.time.string(from: meeting.end))",
             action: meeting.joinURL.map { .join($0) } ?? .open(.calendar),
             actionTitle: meeting.joinURL == nil ? "Open" : "Join",
-            tab: .calendar, duration: startsNow ? 90 : 45, sound: "Glass"
+            tab: .calendar, duration: reminder == .soon ? 30 : 120,
+            sound: reminder == .soon ? "Glass" : reminder == .oneMinute ? "Ping" : "Hero"
         )
     }
 
@@ -149,7 +157,9 @@ struct NoticeView: View {
     private func perform(_ action: Notice.Action) {
         notices.dismiss()
         switch action {
-        case .join(let url): NSWorkspace.shared.open(url)
+        case .join(let url):
+            Services.shared.calendar.markJoined(url: url)
+            NSWorkspace.shared.open(url)
         case .open(let tab): actions.open(tab)
         }
     }
