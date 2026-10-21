@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ToolsView: View {
     @ObservedObject var store: ToolsStore
+    let compare: CompareStore
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -14,6 +15,7 @@ struct ToolsView: View {
             switch store.mode {
             case .generate: GenerateView(store: store)
             case .convert: ConvertView(store: store)
+            case .compare: CompareView(store: compare)
             }
         }
     }

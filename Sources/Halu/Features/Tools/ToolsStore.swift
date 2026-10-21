@@ -4,11 +4,13 @@ import AppKit
 @MainActor
 final class ToolsStore: ObservableObject {
     enum Mode: String, CaseIterable, Identifiable {
-        case generate = "Test data", convert = "Convert"
+        case generate = "Test data", convert = "Convert", compare = "Compare"
         var id: String { rawValue }
     }
 
-    @Published var mode: Mode = .generate
+    @Published var mode: Mode = Mode(rawValue: UserDefaults.standard.string(forKey: "tools.mode") ?? "") ?? .generate {
+        didSet { UserDefaults.standard.set(mode.rawValue, forKey: "tools.mode") }
+    }
     /// Your email, for "+alias" addresses.
     @Published var baseEmail = UserDefaults.standard.string(forKey: "tools.baseEmail") ?? "" {
         didSet {

@@ -35,12 +35,12 @@ Collapsed notch indicator: just the Halu mark in orange with a soft glow, no bac
 Secrets live in ONE Keychain item (`com.milana.halu.secrets`), read once per launch: every local rebuild changes the code identity, so macOS asks once per item.
 13. Quick actions next to Keep Awake. VPN switcher done (Features/VPN): click lists every server grouped by app, picking one switches to it. Sources: `scutil --nc` (Outline and other system VPNs), Pritunl via its own `pritunl-client` CLI (system profiles only: GUI-only profiles keep their keys encrypted by the Pritunl app — never decrypt them), AmneziaVPN has no outside control (Open app).
 
-14. Compare — two inputs (drop, paste, open): text/Markdown/any text file line diff (Swift `difference(from:)`, Myers, with changed words lit), JSON and PDF form fields by path (key order and formatting ignored; `true` ≠ `1`), PDF text via PDFKit, Word/RTF/ODT/HTML via NSAttributedString, images pixel by pixel. No dependencies, nothing leaves the Mac. A file drop on the panel or notch fills Compare while it's open.
+14. Compare (inside Tools, third mode) — two inputs (drop, paste, open): text/Markdown/any text file line diff (Swift `difference(from:)`, Myers, with changed words lit), JSON and PDF form fields by path (key order and formatting ignored; `true` ≠ `1`), PDF text via PDFKit, Word/RTF/ODT/HTML via NSAttributedString, images pixel by pixel. No dependencies, nothing leaves the Mac. A file drop on the panel or notch fills Compare while Tools → Compare is open.
 
 Header right wing is narrow: VPN and Keep Awake are icon-only (details in tooltips). Keep Awake runs `caffeinate -dims` and is restored after Halu restarts.
 
 15. Chat — chatgpt.com (or claude.ai, perplexity.ai) in a WKWebView; the user signs in on the site, no tokens, no scraping or private APIs. One long-lived web view per site.
-16. Tools — test data generator (click copies and regenerates; +alias emails from the user's own address) and Convert (paste anything: JWT, Base64, URL, JSON, timestamps, hashes).
+16. Tools — Test data / Convert / Compare. Test data generator (click copies and regenerates; +alias emails from the user's own address) and Convert (paste anything: JWT, Base64, URL, JSON, timestamps, hashes).
 17. GitLab — your open MRs and MRs where you're a reviewer, new comments since you last opened each (comments fetched only when `user_notes_count` changes), read_api token in Keychain.
 
 Tasks have tags (#tag while typing, picker, filter; new tasks get the active filter's tag). Header shows live download speed (en* byte counters). VPN menu shows ping latency (pinged past the tunnel via `ping -b <Wi-Fi/Ethernet port>`; silence isn't failure) and switches to the next server when one doesn't connect in 25 s.

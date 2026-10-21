@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 enum Tab: String, CaseIterable, Identifiable {
-    case tasks, calendar, claude, chat, jira, gitlab, messages, shelf, clipboard, translate, compare, tools, accounts, notes, media, settings
+    case tasks, calendar, claude, chat, jira, gitlab, messages, shelf, clipboard, translate, tools, accounts, notes, media, settings
 
     var id: String { rawValue }
 
@@ -15,7 +15,6 @@ enum Tab: String, CaseIterable, Identifiable {
         case .shelf: "Shelf"
         case .clipboard: "Clipboard"
         case .translate: "Translate"
-        case .compare: "Compare"
         case .tools: "Tools"
         case .accounts: "Accounts"
         case .notes: "Notes"
@@ -36,7 +35,6 @@ enum Tab: String, CaseIterable, Identifiable {
         case .shelf: "tray.full"
         case .clipboard: "doc.on.clipboard"
         case .translate: "character.bubble"
-        case .compare: "arrow.left.arrow.right.square"
         case .tools: "wrench.and.screwdriver"
         case .accounts: "key.horizontal"
         case .notes: "note.text"
@@ -59,7 +57,9 @@ final class AppModel: ObservableObject {
     @Published private(set) var disabledTabs: Set<Tab>
 
     init() {
-        tab = UserDefaults.standard.string(forKey: "selectedTab").flatMap(Tab.init(rawValue:)) ?? .tasks
+        // Compare used to be its own tab; it lives in Tools now.
+        let saved = UserDefaults.standard.string(forKey: "selectedTab")
+        tab = saved == "compare" ? .tools : saved.flatMap(Tab.init(rawValue:)) ?? .tasks
         disabledTabs = Set((UserDefaults.standard.stringArray(forKey: "disabledTabs") ?? []).compactMap(Tab.init(rawValue:)))
     }
 

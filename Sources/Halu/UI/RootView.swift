@@ -83,8 +83,7 @@ struct ExpandedView: View {
                     case .shelf: ShelfView(store: services.shelf)
                     case .clipboard: ClipboardView(store: services.clipboard)
                     case .translate: TranslateView(store: services.translate, speech: services.speech)
-                    case .compare: CompareView(store: services.compare)
-                    case .tools: ToolsView(store: services.tools)
+                    case .tools: ToolsView(store: services.tools, compare: services.compare)
                     case .accounts: AccountsView(store: services.accounts)
                     case .notes: NotesView(store: services.notes)
                     case .media: MediaView(store: services.media)
@@ -102,8 +101,8 @@ struct ExpandedView: View {
             }
         }
         .onDrop(of: [.fileURL], isTargeted: $dropTargeted) { providers in
-            // On Compare a drop anywhere fills the empty side; elsewhere files go to the Shelf.
-            if model.tab == .compare {
+            // On Tools → Compare a drop anywhere fills the empty side; elsewhere files go to the Shelf.
+            if model.tab == .tools && services.tools.mode == .compare {
                 services.compare.load(providers: providers)
                 return true
             }
