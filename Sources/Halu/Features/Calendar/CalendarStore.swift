@@ -49,7 +49,7 @@ final class CalendarStore: ObservableObject {
     }
 
     func requestAccess() {
-        store.requestFullAccessToEvents { [weak self] _, _ in
+        store.requestFullAccessToEvents { @Sendable [weak self] _, _ in
             DispatchQueue.main.async { self?.refreshAccess() }
         }
     }

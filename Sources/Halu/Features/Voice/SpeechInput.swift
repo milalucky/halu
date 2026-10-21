@@ -41,18 +41,24 @@ final class SpeechInput: ObservableObject {
         problem = nil
         owner = id
         self.onText = onText
-        SFSpeechRecognizer.requestAuthorization { status in
+        // Explicitly @Sendable: these handlers run on a background queue, and a closure that
+        // inherited main-actor isolation would trip the runtime check there.
+        SFSpeechRecognizer.requestAuthorization { @Sendable status in
             DispatchQueue.main.async {
-                guard status == .authorized else {
-                    self.problem = "Allow Speech Recognition for Halu in System Settings."
-                    return
-                }
-                AVCaptureDevice.requestAccess(for: .audio) { granted in
-                    DispatchQueue.main.async {
-                        if granted {
-                            self.begin()
-                        } else {
-                            self.problem = "Allow the microphone for Halu in System Settings."
+                MainActor.assumeIsolated {
+                    guard status == .authorized else {
+                        self.problem = "Allow Speech Recognition for Halu in System Settings → Privacy & Security."
+                        return
+                    }
+                    AVCaptureDevice.requestAccess(for: .audio) { @Sendable granted in
+                        DispatchQueue.main.async {
+                            MainActor.assumeIsolated {
+                                if granted {
+                                    self.begin()
+                                } else {
+                                    self.problem = "Allow the microphone for Halu in System Settings → Privacy & Security."
+                                }
+                            }
                         }
                     }
                 }
@@ -68,6 +74,10 @@ final class SpeechInput: ObservableObject {
     }
 
     private func begin() {
+        guard engine.inputNode.outputFormat(forBus: 0).sampleRate > 0 else {
+            problem = "No microphone input. Check the input device in System Settings → Sound."
+            return
+        }
         guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: language)), recognizer.isAvailable else {
             problem = "Dictation isn't available for this language right now."
             return
@@ -75,6 +85,8 @@ final class SpeechInput: ObservableObject {
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
         request.addsPunctuation = true
+        // On-device when the language model is on this Mac; otherwise Apple's servers.
+        request.requiresOnDeviceRecognition = recognizer.supportsOnDeviceRecognition
         self.request = request
 
         let input = engine.inputNode
@@ -88,9 +100,13 @@ final class SpeechInput: ObservableObject {
             return
         }
         isRecording = true
-        task = Self.recognize(with: recognizer, request: request) { [weak self] text, isFinal in
+        task = Self.recognize(with: recognizer, request: request) { [weak self] text, isFinal, failure in
             guard let self else { return }
             if let text { self.onText?(text) }
+            if let failure, text == nil {
+                NSLog("Halu: dictation failed: \(failure)")
+                self.problem = "Dictation stopped: \(failure)"
+            }
             if isFinal {
                 self.teardownAudio()
                 self.isRecording = false
@@ -111,18 +127,19 @@ final class SpeechInput: ObservableObject {
     private nonisolated static func installTap(on input: AVAudioInputNode, feeding request: SFSpeechAudioBufferRecognitionRequest) {
         let format = input.outputFormat(forBus: 0)
         input.removeTap(onBus: 0)
-        input.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
+        input.installTap(onBus: 0, bufferSize: 1024, format: format) { @Sendable buffer, _ in
             request.append(buffer)
         }
     }
 
     private nonisolated static func recognize(with recognizer: SFSpeechRecognizer,
                                               request: SFSpeechAudioBufferRecognitionRequest,
-                                              update: @escaping @MainActor (String?, Bool) -> Void) -> SFSpeechRecognitionTask {
-        recognizer.recognitionTask(with: request) { result, error in
+                                              update: @escaping @MainActor (String?, Bool, String?) -> Void) -> SFSpeechRecognitionTask {
+        recognizer.recognitionTask(with: request) { @Sendable result, error in
             let text = result?.bestTranscription.formattedString
             let isFinal = result?.isFinal == true || error != nil
-            DispatchQueue.main.async { update(text, isFinal) }
+            let failure = error.map { ($0 as NSError).localizedDescription }
+            DispatchQueue.main.async { MainActor.assumeIsolated { update(text, isFinal, failure) } }
         }
     }
 }
