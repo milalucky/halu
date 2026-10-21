@@ -10,7 +10,7 @@ Native SwiftUI + AppKit app that lives in the MacBook notch and in a virtual not
 ## Product rules
 
 - Minimal, beautiful, clearly better than the reference project (akalikbergenov/cyclop). Do not copy it; Halu has its own design.
-- The repo is public on GitHub (milalucky/halu).
+- The repo is on GitHub (milalucky/halu), private for now; the user will open it later.
 
 ## Tabs (priority order)
 
