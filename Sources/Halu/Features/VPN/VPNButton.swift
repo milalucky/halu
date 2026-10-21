@@ -35,22 +35,32 @@ struct VPNButton: View {
 
     @ViewBuilder
     private func menu(_ active: VPNController.Connection?) -> some View {
-        if let active {
-            Button("Turn off \(active.name)") { vpn.set(active, on: false) }
+        if let status = vpn.status {
+            Text(status)
             Divider()
         }
+        if let active {
+            Button("Turn off \(active.name)") { vpn.set(active, on: false) }
+        }
+        if vpn.connections.contains(where: { $0.kind == .pritunl }) {
+            Button("Connect to the quickest server") { vpn.connectFastest() }
+        }
+        Divider()
         ForEach(providers, id: \.self) { provider in
             Section(provider) {
                 ForEach(vpn.connections.filter { $0.provider == provider }) { connection in
                     Button {
-                        if connection.state == .off { vpn.set(connection, on: true) }
+                        if connection.state == .off { vpn.connect(connection) }
                     } label: {
+                        let title = connection.name + detail(connection)
                         if connection.state == .on {
-                            Label(connection.name, systemImage: "checkmark")
+                            Label(title, systemImage: "checkmark")
                         } else if connection.state == .connecting {
-                            Label(connection.name + " · connecting", systemImage: "ellipsis")
+                            Label(connection.name + " · connecting…", systemImage: "ellipsis")
+                        } else if vpn.failed[connection.id].map({ Date().timeIntervalSince($0) < 600 }) == true {
+                            Label(title + " · didn't connect", systemImage: "exclamationmark.triangle")
                         } else {
-                            Text(connection.name)
+                            Text(title)
                         }
                     }
                 }
@@ -62,6 +72,12 @@ struct VPNButton: View {
                 Button("Open \(app.name)") { vpn.open(app) }
             }
         }
+    }
+
+    /// "  ·  190 ms" for servers that answer a ping.
+    private func detail(_ connection: VPNController.Connection) -> String {
+        guard let ms = vpn.latency[connection.id] ?? nil else { return "" }
+        return "  ·  \(Int(ms.rounded())) ms"
     }
 
     private var providers: [String] {
