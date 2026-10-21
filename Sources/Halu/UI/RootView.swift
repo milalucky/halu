@@ -72,7 +72,7 @@ struct ExpandedView: View {
         VStack(spacing: 0) {
             HeaderBar(model: model, awake: services.awake, vpn: services.vpn, speed: services.speed, claude: services.claude, geometry: geometry)
             HStack(spacing: 0) {
-                Sidebar(model: model, claude: services.claude, media: services.media, messages: services.messages)
+                Sidebar(model: model, claude: services.claude, media: services.media, messages: services.messages, gitlab: services.gitlab)
                 Rectangle().fill(Theme.hairline).frame(width: 1).padding(.vertical, 6)
                 Group {
                     switch model.tab {
@@ -90,7 +90,8 @@ struct ExpandedView: View {
                     case .media: MediaView(store: services.media)
                     case .messages: MessagesView(store: services.messages)
                     case .jira: JiraView(store: services.jira) { model.tab = .settings }
-                    case .settings: IntegrationsView(model: model, jira: services.jira, messages: services.messages)
+                    case .gitlab: GitLabView(store: services.gitlab) { model.tab = .settings }
+                    case .settings: IntegrationsView(model: model, jira: services.jira, gitlab: services.gitlab, messages: services.messages)
                     }
                 }
                 .padding(.leading, 18)
@@ -177,6 +178,7 @@ struct Sidebar: View {
     @ObservedObject var claude: ClaudeStore
     @ObservedObject var media: MediaStore
     @ObservedObject var messages: MessagesStore
+    @ObservedObject var gitlab: GitLabStore
     @Namespace private var selection
 
     /// Media only shows up while something plays or sits paused.
@@ -194,7 +196,8 @@ struct Sidebar: View {
                 VStack(spacing: 1) {
                     ForEach(tabs) { tab in
                         TabButton(tab: tab, selected: model.tab == tab, height: tabs.count > 11 ? 26 : 30,
-                                  dot: (tab == .claude && !claude.attention.isEmpty) || (tab == .messages && messages.unseen > 0),
+                                  dot: (tab == .claude && !claude.attention.isEmpty) || (tab == .messages && messages.unseen > 0)
+                                      || (tab == .gitlab && gitlab.newComments > 0),
                                   selection: selection) {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { model.tab = tab }
                         }

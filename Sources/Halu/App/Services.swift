@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 enum Tab: String, CaseIterable, Identifiable {
-    case tasks, calendar, claude, chat, jira, messages, shelf, clipboard, translate, compare, tools, accounts, notes, media, settings
+    case tasks, calendar, claude, chat, jira, gitlab, messages, shelf, clipboard, translate, compare, tools, accounts, notes, media, settings
 
     var id: String { rawValue }
 
@@ -21,6 +21,7 @@ enum Tab: String, CaseIterable, Identifiable {
         case .notes: "Notes"
         case .media: "Media"
         case .jira: "Jira"
+        case .gitlab: "GitLab"
         case .messages: "Messages"
         case .settings: "Settings"
         }
@@ -41,6 +42,7 @@ enum Tab: String, CaseIterable, Identifiable {
         case .notes: "note.text"
         case .media: "play.circle"
         case .jira: "ticket"
+        case .gitlab: "arrow.triangle.branch"
         case .messages: "bubble.left.and.bubble.right"
         case .settings: "gearshape"
         }
@@ -103,6 +105,7 @@ final class Services {
     let compare = CompareStore()
     let chat = ChatStore()
     let tools = ToolsStore()
+    let gitlab = GitLabStore()
     let vpn = VPNController()
     let speed = NetworkSpeed()
 
@@ -151,6 +154,8 @@ final class Services {
         jira.start()
         messages.start()
         vpn.start()
+        gitlab.isActive = { model.isEnabled(.gitlab) }
+        gitlab.start()
         awake.restore()
     }
 }

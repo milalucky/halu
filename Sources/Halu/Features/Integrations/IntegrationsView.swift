@@ -4,6 +4,7 @@ import SwiftUI
 struct IntegrationsView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var jira: JiraStore
+    @ObservedObject var gitlab: GitLabStore
     @ObservedObject var messages: MessagesStore
 
     var body: some View {
@@ -18,6 +19,7 @@ struct IntegrationsView: View {
                 SectionHeader(title: "Integrations", detail: "Jira's token stays in your Keychain; the rest is read from open tabs")
                     .padding(.top, 8)
                 JiraCard(store: jira)
+                GitLabCard(store: gitlab)
                 ForEach(WebInbox.Site.allCases, id: \.self) { site in
                     WebSourceCard(site: site, accounts: messages.webAccounts[site.rawValue])
                 }
@@ -105,6 +107,71 @@ private struct JiraCard: View {
         }
         .padding(14)
         .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.card))
+    }
+}
+
+private struct GitLabCard: View {
+    @ObservedObject var store: GitLabStore
+    @State private var problem: String?
+    @State private var connecting = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Image(systemName: "arrow.triangle.branch").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.orange)
+                Text("GitLab").font(Theme.body(13.5, weight: .semibold)).foregroundStyle(Theme.primary)
+                Spacer()
+                if store.isConnected {
+                    Text("Connected").font(Theme.caption(11, weight: .semibold)).foregroundStyle(Theme.green)
+                }
+            }
+            if store.isConnected {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(store.userName ?? "").font(Theme.body(12.5)).foregroundStyle(Theme.primary)
+                        Text(store.server).font(Theme.caption(11, weight: .regular)).foregroundStyle(Theme.tertiary)
+                    }
+                    Spacer()
+                    PillButton(title: "Disconnect", tint: Theme.red, prominent: false, action: store.disconnect)
+                }
+            } else {
+                Field(placeholder: "gitlab.your-company.com", text: $store.draftServer)
+                Field(placeholder: "Personal access token (read_api)", text: $store.draftToken, secure: true)
+                HStack {
+                    if let link = tokenPage {
+                        Link("Create a token", destination: link)
+                            .font(Theme.caption(11.5, weight: .medium))
+                            .foregroundStyle(Theme.accent)
+                    }
+                    Spacer()
+                    if connecting { ProgressView().controlSize(.small) }
+                    PillButton(title: "Connect") {
+                        connecting = true
+                        Task {
+                            problem = await store.connect()
+                            connecting = false
+                        }
+                    }
+                }
+                Text("Read-only: Halu only looks at merge requests and comments.")
+                    .font(Theme.caption(11, weight: .regular))
+                    .foregroundStyle(Theme.tertiary)
+                if let problem {
+                    Text(problem).font(Theme.caption(11.5, weight: .regular)).foregroundStyle(Theme.orange)
+                }
+            }
+        }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.card))
+    }
+
+    /// The server's own token page, with the name and scope filled in.
+    private var tokenPage: URL? {
+        var host = store.draftServer.trimmingCharacters(in: .whitespaces)
+        guard host.contains(".") else { return nil }
+        if !host.hasPrefix("http") { host = "https://" + host }
+        while host.hasSuffix("/") { host.removeLast() }
+        return URL(string: host + "/-/user_settings/personal_access_tokens?name=Halu&scopes=read_api")
     }
 }
 

@@ -39,6 +39,12 @@ Secrets live in ONE Keychain item (`com.milana.halu.secrets`), read once per lau
 
 Header right wing is narrow: VPN and Keep Awake are icon-only (details in tooltips). Keep Awake runs `caffeinate -dims` and is restored after Halu restarts.
 
+15. Chat — chatgpt.com (or claude.ai, perplexity.ai) in a WKWebView; the user signs in on the site, no tokens, no scraping or private APIs. One long-lived web view per site.
+16. Tools — test data generator (click copies and regenerates; +alias emails from the user's own address) and Convert (paste anything: JWT, Base64, URL, JSON, timestamps, hashes).
+17. GitLab — your open MRs and MRs where you're a reviewer, new comments since you last opened each (comments fetched only when `user_notes_count` changes), read_api token in Keychain.
+
+Tasks have tags (#tag while typing, picker, filter; new tasks get the active filter's tag). Header shows live download speed (en* byte counters). VPN menu shows ping latency (pinged past the tunnel via `ping -b <Wi-Fi/Ethernet port>`; silence isn't failure) and switches to the next server when one doesn't connect in 25 s.
+
 Tabs are configurable in Settings (gear): all on by default; a disabled tab hides from the sidebar, pauses its store's background work (`isActive`), and drops its notch indicators.
 
 ## Roadmap
