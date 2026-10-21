@@ -7,12 +7,22 @@ struct AccountsView: View {
 
     private var groups: [(service: String, accounts: [Account])] {
         let filtered = store.accounts.filter { account in
-            query.isEmpty || [account.service, account.login, account.notes].contains { $0.localizedCaseInsensitiveContains(query) }
+            (store.serviceFilter.map { filter in AccountStore.tags(of: account.service).contains { $0.caseInsensitiveCompare(filter) == .orderedSame } } ?? true)
+                && (query.isEmpty || [account.service, account.login, account.notes].contains { $0.localizedCaseInsensitiveContains(query) })
         }
         let grouped = Dictionary(grouping: filtered, by: \.service)
         return grouped.keys
             .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
             .map { ($0, grouped[$0] ?? []) }
+    }
+
+    private func count(_ tag: String) -> Int {
+        store.accounts.filter { AccountStore.tags(of: $0.service).contains { $0.caseInsensitiveCompare(tag) == .orderedSame } }.count
+    }
+
+    private func report(_ added: Int) {
+        withAnimation { importNote = added == 0 ? "Nothing new to import. Expected Service · Login · Password · Notes." : "Imported \(added) account\(added == 1 ? "" : "s")" }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { withAnimation { importNote = nil } }
     }
 
     var body: some View {
@@ -28,16 +38,40 @@ struct AccountsView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 InputField(placeholder: "Search service, login or note", icon: "magnifyingglass", text: $query)
-                IconButton(icon: "square.and.arrow.down", help: "Import rows copied from a table: Service, Login, Password, Notes", size: 12) {
-                    let added = store.importFromClipboard()
-                    withAnimation { importNote = added == 0 ? "Copy table rows first: Service · Login · Password · Notes" : "Imported \(added) accounts" }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) { withAnimation { importNote = nil } }
+                Menu {
+                    Button("From a file…  (Markdown, CSV)") {
+                        if let added = store.chooseFileToImport() { report(added) }
+                    }
+                    Button("From the clipboard") { report(store.importFromClipboard()) }
+                } label: {
+                    Image(systemName: "square.and.arrow.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.secondary)
+                        .frame(width: 24, height: 24)
                 }
+                .menuStyle(.button)
+                .buttonStyle(.plain)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help("Import accounts: a Markdown or CSV file, or table rows copied to the clipboard (Service · Login · Password · Notes)")
                 IconButton(icon: "plus", help: "Add account", size: 12) {
                     withAnimation(.easeOut(duration: 0.2)) {
                         store.editing = Account(service: query, login: "", password: "", notes: "")
                     }
                 }
+            }
+            if store.serviceTags.count > 1 {
+                ScrollView(.horizontal) {
+                    HStack(spacing: 6) {
+                        ServiceChip(title: "All", count: store.accounts.count, selected: store.serviceFilter == nil) { store.serviceFilter = nil }
+                        ForEach(store.serviceTags, id: \.self) { tag in
+                            ServiceChip(title: tag, count: count(tag), selected: store.serviceFilter?.caseInsensitiveCompare(tag) == .orderedSame) {
+                                store.serviceFilter = store.serviceFilter == tag ? nil : tag
+                            }
+                        }
+                    }
+                }
+                .scrollIndicators(.never)
             }
             if let importNote {
                 Text(importNote).font(Theme.caption(11, weight: .medium)).foregroundStyle(Theme.accent)
@@ -56,7 +90,7 @@ struct AccountsView: View {
 
             if groups.isEmpty && store.editing == nil {
                 EmptyState(icon: "key.horizontal", title: query.isEmpty ? "No accounts yet" : "No matches",
-                           subtitle: query.isEmpty ? "Add test accounts one by one, or copy rows from your table and press Import." : "Try another word.")
+                           subtitle: query.isEmpty ? "Add test accounts one by one, or import a Markdown or CSV file, or rows copied from a table." : "Try another word.")
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 2) {
@@ -80,6 +114,28 @@ struct AccountsView: View {
                 .scrollIndicators(.never)
             }
         }
+    }
+}
+
+private struct ServiceChip: View {
+    let title: String
+    let count: Int
+    let selected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Text(title)
+                Text("\(count)").foregroundStyle(selected ? Color.black.opacity(0.5) : Theme.tertiary)
+            }
+            .font(Theme.caption(11.5, weight: .semibold))
+            .foregroundStyle(selected ? Color.black.opacity(0.85) : Theme.secondary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(Capsule().fill(selected ? Theme.primary : Theme.card))
+        }
+        .buttonStyle(.plain)
     }
 }
 

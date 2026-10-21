@@ -134,6 +134,12 @@ final class Services {
         shelf.start()
         clipboard.start()
         accounts.start()
+        // `Halu --import-accounts <file>`: one-off import of a Markdown/CSV file into the vault.
+        let arguments = CommandLine.arguments
+        if let flag = arguments.firstIndex(of: "--import-accounts"), flag + 1 < arguments.count {
+            let added = accounts.importFile(URL(fileURLWithPath: arguments[flag + 1]))
+            NSLog("Halu: imported \(added) accounts")
+        }
         media.start()
         jira.start()
         messages.start()

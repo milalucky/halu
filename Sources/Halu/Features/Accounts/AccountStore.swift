@@ -60,24 +60,64 @@ final class AccountStore: ObservableObject {
         persist()
     }
 
-    /// Imports rows copied from a table (Word, Excel, Numbers): Service, Login, Password, Notes.
+    /// Imports rows copied from a table (Word, Excel, Numbers) or a Markdown list from the clipboard.
     @discardableResult
     func importFromClipboard() -> Int {
         guard let text = NSPasteboard.general.string(forType: .string) else { return 0 }
+        return importText(text)
+    }
+
+    /// Imports a Markdown, CSV/TSV or plain table file. Returns how many accounts were added.
+    @discardableResult
+    func importFile(_ url: URL) -> Int {
+        guard let data = try? Data(contentsOf: url) else { return 0 }
+        return importText(String(decoding: data, as: UTF8.self))
+    }
+
+    func chooseFileToImport() -> Int? {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.plainText, .commaSeparatedText, .tabSeparatedText, .init(filenameExtension: "md") ?? .plainText]
+        panel.allowsMultipleSelection = false
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK, let url = panel.url else { return nil }
+        return importFile(url)
+    }
+
+    /// Accounts already there (same service and login) are skipped.
+    private func importText(_ text: String) -> Int {
         var added = 0
-        for line in text.components(separatedBy: .newlines) {
-            let cells = line.components(separatedBy: "\t").map { $0.trimmingCharacters(in: .whitespaces) }
-            guard cells.count >= 3, !cells[0].isEmpty, !cells[1].isEmpty else { continue }
-            let header = cells[1].lowercased()
-            if header == "login" || header == "логин" || header == "username" { continue }
-            let notes = cells.count > 3 ? cells[3...].joined(separator: " ").trimmingCharacters(in: .whitespaces) : ""
-            if accounts.contains(where: { $0.service == cells[0] && $0.login == cells[1] }) { continue }
-            accounts.append(Account(service: cells[0], login: cells[1], password: cells[2], notes: notes))
+        for row in AccountImport.parse(text) {
+            let service = row.service.trimmingCharacters(in: .whitespaces)
+            let login = row.login.trimmingCharacters(in: .whitespaces)
+            guard !service.isEmpty, !login.isEmpty,
+                  !accounts.contains(where: { $0.service == service && $0.login == login }) else { continue }
+            accounts.append(Account(service: service, login: login, password: row.password, notes: row.notes))
             added += 1
         }
         if added > 0 { persist() }
         return added
     }
+
+    /// Services to filter by. A combined service ("losolo, losolo3", "StarSteer — losolo2") counts for
+    /// each of its parts; addresses (hosts, URLs) are left out. Case doesn't split a service in two.
+    var serviceTags: [String] {
+        var seen: [String: String] = [:]
+        for account in accounts {
+            for tag in Self.tags(of: account.service) where seen[tag.lowercased()] == nil { seen[tag.lowercased()] = tag }
+        }
+        return seen.values.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+    }
+
+    nonisolated static func tags(of service: String) -> [String] {
+        let parts = service.replacingOccurrences(of: #"\S+://\S+"#, with: "", options: .regularExpression)
+            .components(separatedBy: CharacterSet(charactersIn: ",—–;"))
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && !$0.contains("://") && !$0.contains(".") }
+        return parts.isEmpty ? [service] : parts
+    }
+
+    /// The service chip picked in the Accounts tab (nil = all); kept while the panel is closed.
+    @Published var serviceFilter: String?
 
     /// Copies a secret marked as concealed (clipboard managers skip it) and clears it after a minute.
     func copySecret(_ value: String) {
