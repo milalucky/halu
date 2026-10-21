@@ -64,7 +64,7 @@ struct ExpandedView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HeaderBar(model: model, awake: services.awake, geometry: geometry)
+            HeaderBar(model: model, awake: services.awake, claude: services.claude, geometry: geometry)
             HStack(spacing: 0) {
                 Sidebar(model: model, claude: services.claude)
                 Rectangle().fill(Theme.hairline).frame(width: 1).padding(.vertical, 6)
@@ -103,17 +103,23 @@ struct ExpandedView: View {
 struct HeaderBar: View {
     @ObservedObject var model: AppModel
     @ObservedObject var awake: AwakeController
+    @ObservedObject var claude: ClaudeStore
     let geometry: NotchGeometry
 
     var body: some View {
         let wing = (Layout.expandedWidth - (geometry.hasNotch ? geometry.notchSize.width : 0)) / 2 - 20
         HStack(spacing: 0) {
-            Text(model.tab.title)
-                .font(Theme.title(14))
-                .foregroundStyle(Theme.primary)
-                .contentTransition(.opacity)
-                .animation(.easeOut(duration: 0.15), value: model.tab)
-                .frame(width: wing, alignment: .leading)
+            HStack(spacing: 8) {
+                // The mark runs while any Claude session is working.
+                HaluMark(size: 15, color: Theme.primary, animating: claude.rows.contains { $0.phase == .working })
+                Text("Halu").font(Theme.title(14)).foregroundStyle(Theme.primary)
+                Text(model.tab.title)
+                    .font(Theme.title(14))
+                    .foregroundStyle(Theme.tertiary)
+                    .contentTransition(.opacity)
+                    .animation(.easeOut(duration: 0.15), value: model.tab)
+            }
+            .frame(width: wing, alignment: .leading)
                 .padding(.leading, 22)
 
             Spacer(minLength: 0)
@@ -261,10 +267,7 @@ struct BadgeView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            Image(systemName: "sparkle")
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(Theme.orange)
-                .symbolEffect(.pulse, options: .repeating)
+            HaluMark(size: 14, color: Theme.orange, animating: true)
                 .frame(width: 50)
             Spacer(minLength: 0)
             Text("\(count)")

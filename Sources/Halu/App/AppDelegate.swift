@@ -15,7 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func setupStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        item.button?.image = NSImage(systemSymbolName: "moon.stars", accessibilityDescription: "Halu")
+        item.button?.image = HaluMark.menuBarImage()
         let menu = NSMenu()
         menu.delegate = self
         item.menu = menu

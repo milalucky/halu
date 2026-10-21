@@ -95,7 +95,11 @@ private struct SessionRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 10) {
-                StatusDot(tint: tint, pulsing: row.phase == .working)
+                if row.phase == .working {
+                    HaluMark(size: 14, color: tint, animating: true)
+                } else {
+                    StatusDot(tint: tint, pulsing: false)
+                }
                 Text(session.displayTitle)
                     .font(Theme.body(13, weight: .medium))
                     .foregroundStyle(row.phase == .done ? Theme.secondary : Theme.primary)
