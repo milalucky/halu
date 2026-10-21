@@ -20,6 +20,7 @@ struct IntegrationsView: View {
                     .padding(.top, 8)
                 JiraCard(store: jira)
                 GitLabCard(store: gitlab)
+                WeatherCard(weather: Services.shared.weather)
                 ForEach(WebInbox.Site.allCases, id: \.self) { site in
                     WebSourceCard(site: site, accounts: messages.webAccounts[site.rawValue])
                 }
@@ -103,6 +104,33 @@ private struct JiraCard: View {
                 if let problem {
                     Text(problem).font(Theme.caption(11.5, weight: .regular)).foregroundStyle(Theme.orange)
                 }
+            }
+        }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.card))
+    }
+}
+
+/// Where the header's weather is for: a city, or the Mac's location.
+private struct WeatherCard: View {
+    @ObservedObject var weather: WeatherStore
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Image(systemName: "cloud.sun.fill").symbolRenderingMode(.multicolor).font(.system(size: 14))
+                Text("Weather").font(Theme.body(13.5, weight: .semibold)).foregroundStyle(Theme.primary)
+                Text(weather.place.isEmpty ? "" : weather.place).font(Theme.caption(11, weight: .regular)).foregroundStyle(Theme.tertiary)
+                Spacer()
+            }
+            HStack(spacing: 8) {
+                Field(placeholder: "City (empty: where I am)", text: $weather.city)
+                    .onSubmit(weather.refresh)
+                PillButton(title: "Update", prominent: false, action: weather.refresh)
+                if !weather.city.isEmpty { PillButton(title: "Use my location", prominent: false, action: weather.useMyLocation) }
+            }
+            if let problem = weather.problem {
+                Text(problem).font(Theme.caption(11.5, weight: .regular)).foregroundStyle(Theme.orange)
             }
         }
         .padding(14)

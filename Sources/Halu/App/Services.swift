@@ -113,6 +113,7 @@ final class Services {
     let speed = NetworkSpeed()
     let pomodoro = PomodoroTimer()
     let claudeRequests = ClaudeRequests()
+    let weather = WeatherStore()
     lazy var live = LiveCenter(calendar: calendar, pomodoro: pomodoro)
 
     /// Something waiting for the user, shown on the collapsed notch: Claude first, then unread messages.
@@ -146,6 +147,7 @@ final class Services {
         }
         live.start()
         claudeRequests.start()
+        weather.start()
         calendar.onReminder = { [notices] meeting, reminder in
             notices.post(.meeting(meeting, reminder))
         }

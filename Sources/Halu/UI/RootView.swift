@@ -173,7 +173,9 @@ struct HeaderBar: View {
                     .contentTransition(.opacity)
                     .animation(.easeOut(duration: 0.15), value: model.tab)
                     .lineLimit(1)
+                    .layoutPriority(-1)
                 Spacer(minLength: 4)
+                WeatherPill(weather: Services.shared.weather)
                 ClaudeUsagePill(requests: Services.shared.claudeRequests)
             }
             .frame(width: wing, alignment: .leading)

@@ -28,6 +28,10 @@
     <string>Halu shows your upcoming meetings and reminds you before they start.</string>
     <key>NSAppleEventsUsageDescription</key>
     <string>Halu shows and edits your Apple Notes in the Notes tab.</string>
+    <key>NSLocationUsageDescription</key>
+    <string>Halu shows the current weather for where you are.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Halu shows the current weather for where you are.</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Halu listens only while you dictate a task or a translation.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
