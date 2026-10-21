@@ -74,6 +74,10 @@ struct ExpandedView: View {
                     case .calendar: CalendarView(store: services.calendar)
                     case .claude: ClaudeView(store: services.claude)
                     case .shelf: ShelfView(store: services.shelf)
+                    case .clipboard: ClipboardView(store: services.clipboard)
+                    case .translate: TranslateView(store: services.translate, speech: services.speech)
+                    case .accounts: AccountsView(store: services.accounts)
+                    case .notes: NotesView(store: services.notes)
                     }
                 }
                 .padding(.leading, 18)
@@ -110,8 +114,9 @@ struct HeaderBar: View {
         let wing = (Layout.expandedWidth - (geometry.hasNotch ? geometry.notchSize.width : 0)) / 2 - 20
         HStack(spacing: 0) {
             HStack(spacing: 8) {
-                // The mark runs while any Claude session is working.
-                HaluMark(size: 15, color: Theme.primary, animating: claude.rows.contains { $0.phase == .working })
+                // The mark runs only on the Claude tab, while a session is working.
+                HaluMark(size: 15, color: Theme.primary,
+                         animating: model.tab == .claude && claude.rows.contains { $0.phase == .working })
                 Text("Halu").font(Theme.title(14)).foregroundStyle(Theme.primary)
                 Text(model.tab.title)
                     .font(Theme.title(14))
@@ -149,7 +154,7 @@ struct Sidebar: View {
     @Namespace private var selection
 
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 2) {
             ForEach(Tab.allCases) { tab in
                 TabButton(tab: tab, selected: model.tab == tab, dot: tab == .claude && !claude.attention.isEmpty,
                           selection: selection) {
@@ -187,7 +192,7 @@ struct TabButton: View {
                     .font(.system(size: 14, weight: selected ? .semibold : .regular))
                     .foregroundStyle(selected ? Theme.primary : (hovering ? Theme.secondary : Theme.tertiary))
             }
-            .frame(width: 38, height: 34)
+            .frame(width: 38, height: 32)
             .overlay(alignment: .topTrailing) {
                 if dot {
                     Circle().fill(Theme.orange).frame(width: 6, height: 6).offset(x: -6, y: 6)

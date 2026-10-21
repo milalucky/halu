@@ -16,9 +16,13 @@ Halu stays invisible until you point at the notch, then unfolds into a small pan
 - **Calendar.** Today's and tomorrow's meetings from any calendar on your Mac, including Google. One-click **Join** for Zoom, Google Meet, Teams and Webex. A reminder drops out of the notch 10 minutes before a meeting and again when it starts.
 - **Claude.** Live status of your Claude Code sessions: working, waiting for you, your turn, done, with a progress bar built from each session's plan. When Claude needs an answer, the notch lights up and a notice pops out.
 - **Shelf.** New screenshots and screen recordings appear here automatically, along with images you copy. Drag them out wherever you need them, or drop any file onto the notch to keep it for later.
+- **Clipboard.** Recent text you copied plus saved snippets, one click to copy again. Anything a password manager marks as secret is never recorded.
+- **Translate.** English ↔ Russian with automatic direction. Type or dictate, then copy the translation.
+- **Accounts.** A searchable vault for test accounts: service, login, password and notes, grouped by service. Encrypted on disk with a key kept in your Keychain; copied passwords clear from the clipboard after a minute. Paste rows from a table to import them.
+- **Notes.** A quick scratch pad; empty notes clean themselves up.
 - **Keep Awake.** One tap keeps your Mac from sleeping while long work runs, for an hour, three hours or until you turn it off.
 
-On the roadmap: clipboard history and snippets, translation with voice input, a test-accounts vault, notes, media controls, Jira and Slack integrations, and an iPhone companion app with sync.
+On the roadmap: media controls, Jira and Slack integrations, and an iPhone companion app with sync.
 
 ## Requirements
 

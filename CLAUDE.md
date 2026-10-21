@@ -29,4 +29,6 @@ Later: Integrations screen with API keys — Jira (company Atlassian, API token)
 ## Roadmap
 
 - **iPhone app** with the same features, **synced with the Mac app**. Keep models Codable and storage swappable so a sync backend (e.g. CloudKit) can be added later.
-- Keep Awake button (`caffeinate`) — one tap, animated.
+- Keep Awake button (`caffeinate`) — one tap, animated. Done.
+- More quick-action buttons next to Keep Awake (one-tap commands). Ideas to be collected with the user.
+- The animated Halu mark spins only where work is in progress (Claude tab, running tasks), never constantly in the main panel.
