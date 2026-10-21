@@ -93,15 +93,27 @@ final class MediaStore: ObservableObject {
 
     // MARK: Core Audio
 
+    /// Where audio and video usually come from. Some apps (Claude, call apps) keep an output open in
+    /// silence, so these win whenever one of them is sending audio too.
+    private static let mediaApps = [
+        "com.google.Chrome", "com.apple.Safari", "company.thebrowser.Browser", "ru.yandex.desktop.yandex-browser",
+        "org.mozilla.firefox", "com.microsoft.edgemac", "com.operasoftware.Opera", "com.brave.Browser",
+        "ru.yandex.desktop.music", "com.apple.Music", "com.spotify.client", "com.apple.podcasts", "com.apple.TV",
+        "com.colliderli.iina", "org.videolan.vlc", "com.apple.QuickTimePlayerX",
+    ]
+
     /// The app (not its helper process) that is sending audio to an output right now.
     private static func appPlayingAudio() -> NSRunningApplication? {
         let ownPID = ProcessInfo.processInfo.processIdentifier
+        var candidates: [NSRunningApplication] = []
         for object in processObjects() {
             guard uint32(object, kAudioProcessPropertyIsRunningOutput) != 0,
-                  let pid = pid(object), pid != ownPID else { continue }
-            if let app = owningApp(pid: pid, bundleID: string(object, kAudioProcessPropertyBundleID)) { return app }
+                  let pid = pid(object), pid != ownPID,
+                  let app = owningApp(pid: pid, bundleID: string(object, kAudioProcessPropertyBundleID)),
+                  app.processIdentifier != ownPID, !candidates.contains(app) else { continue }
+            candidates.append(app)
         }
-        return nil
+        return candidates.first { mediaApps.contains($0.bundleIdentifier ?? "") } ?? candidates.first
     }
 
     /// Browsers and Electron apps play sound from helper processes; map them to the app the user sees.

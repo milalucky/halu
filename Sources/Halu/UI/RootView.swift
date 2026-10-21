@@ -172,7 +172,7 @@ struct Sidebar: View {
         VStack(spacing: 1) {
             ForEach(tabs) { tab in
                 TabButton(tab: tab, selected: model.tab == tab,
-                          dot: (tab == .claude && !claude.attention.isEmpty) || (tab == .messages && messages.unseen > 0 && model.tab != .messages),
+                          dot: (tab == .claude && !claude.attention.isEmpty) || (tab == .messages && messages.unseen > 0),
                           selection: selection) {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { model.tab = tab }
                 }
@@ -300,7 +300,7 @@ struct BadgeView: View {
                     HaluMark(size: 13, color: Theme.orange, animating: true)
                 }
                 ForEach(apps.prefix(claudeWaiting > 0 ? 2 : 3), id: \.self) { app in
-                    GlowingIcon(image: messages.icon(for: app))
+                    GlowingIcon(image: messages.icon(forSource: app))
                 }
             }
             .frame(width: Layout.badgeWing)

@@ -17,8 +17,6 @@ struct MessagesView: View {
                 list
             }
         }
-        .onAppear(perform: store.markSeen)
-        .onChange(of: store.messages) { _, _ in store.markSeen() }
     }
 
     private var list: some View {
@@ -39,8 +37,8 @@ struct MessagesView: View {
                 }
             }
             if store.visible.isEmpty {
-                EmptyState(icon: "bubble.left.and.bubble.right", title: "No new messages",
-                           subtitle: "New Slack, Telegram and mail messages from the last day show up here as they arrive.")
+                EmptyState(icon: "bubble.left.and.bubble.right", title: "All read",
+                           subtitle: "Unread Slack, Telegram and mail messages show up here, and leave once you read them in their app.")
             } else {
                 ScrollView {
                     LazyVStack(spacing: 2) {
@@ -81,7 +79,7 @@ private struct MessageRow: View {
         HoverRow { hovering in
             HStack(alignment: .top, spacing: 10) {
                 Group {
-                    if let icon = store.icon(for: message.appID) {
+                    if let icon = store.icon(for: message) {
                         Image(nsImage: icon).resizable()
                     } else {
                         Image(systemName: "bubble.left.fill").foregroundStyle(Theme.tertiary)

@@ -9,11 +9,15 @@ struct IncomingMessage: Identifiable, Equatable {
     var subtitle: String
     var body: String
     var date: Date
+    /// Set for messages from a web app (Gmail, Telegram Web): opened in the browser.
+    var url: URL?
 }
 
-/// New messages from Slack, Telegram, other messengers and mail apps, read from the notifications macOS already
-/// received for them. No tokens or sign-in needed; it takes Full Disk Access, because the notification
-/// database is protected.
+/// Unread messages from Slack, Telegram, mail and other messengers, read from the notifications macOS
+/// received for them. A message counts as unread while its notification is still in Notification Center:
+/// Slack, Mail and the rest remove it once you read the message. Web apps in a browser (Gmail, Telegram
+/// Web, Slack in the browser) are recognised by their site. No tokens or sign-in; it takes Full Disk
+/// Access, because the notification database is protected.
 @MainActor
 final class MessagesStore: ObservableObject {
     enum Access { case unknown, granted, needsFullDiskAccess, unreadable }
@@ -21,6 +25,7 @@ final class MessagesStore: ObservableObject {
     @Published private(set) var access: Access = .unknown
     @Published private(set) var messages: [IncomingMessage] = []
     @Published var appFilter: String?
+    /// Unread messages still waiting; drives the sidebar dot and the notch indicators.
     @Published private(set) var unseen = 0
 
     /// Messenger bundle ids and the names shown for them.
@@ -41,9 +46,24 @@ final class MessagesStore: ObservableObject {
         "com.readdle.SparkDesktop.appstore": "Spark",
     ]
 
-    /// How far back "new" reaches.
-    private let window: TimeInterval = 24 * 3600
-    private var lastSeen = UserDefaults.standard.object(forKey: "messages.lastSeen") as? Date ?? .distantPast
+    /// Browsers whose notifications may come from a web messenger or web mail.
+    nonisolated static let browsers = [
+        "com.google.Chrome", "com.apple.Safari", "company.thebrowser.Browser", "ru.yandex.desktop.yandex-browser",
+        "org.mozilla.firefox", "com.microsoft.edgemac", "com.operasoftware.Opera", "com.brave.Browser",
+    ]
+
+    /// Sites recognised in browser notifications: name and the page to open.
+    nonisolated static let webApps: [(site: String, name: String, url: String)] = [
+        ("mail.google.com", "Gmail", "https://mail.google.com"),
+        ("web.telegram.org", "Telegram", "https://web.telegram.org"),
+        ("app.slack.com", "Slack", "https://app.slack.com"),
+        ("outlook.office.com", "Outlook", "https://outlook.office.com/mail"),
+        ("outlook.live.com", "Outlook", "https://outlook.live.com/mail"),
+        ("web.whatsapp.com", "WhatsApp", "https://web.whatsapp.com"),
+    ]
+
+    /// Older notifications are not "waiting" any more, even if never cleared.
+    private let window: TimeInterval = 7 * 24 * 3600
     private var dismissed = Set(UserDefaults.standard.array(forKey: "messages.dismissed") as? [Int64] ?? [])
     private var timer: Timer?
     private let queue = DispatchQueue(label: "halu.messages", qos: .utility)
@@ -59,14 +79,10 @@ final class MessagesStore: ObservableObject {
         messages.filter { appFilter == nil || $0.appName == appFilter }
     }
 
-    func isNew(_ message: IncomingMessage) -> Bool { message.date > lastSeen }
-
-    /// Apps with unread messages, most recent first; drives the icons on the collapsed notch.
+    /// Sources with unread messages, most recent first (their names); drives the notch icons.
     var unseenApps: [String] {
         var apps: [String] = []
-        for message in messages where message.date > lastSeen && !apps.contains(message.appID) {
-            apps.append(message.appID)
-        }
+        for message in messages where !apps.contains(message.appName) { apps.append(message.appName) }
         return apps
     }
 
@@ -96,33 +112,30 @@ final class MessagesStore: ObservableObject {
                     self.access = .granted
                     let fresh = found.filter { !self.dismissed.contains($0.id) }
                     if fresh != self.messages { self.messages = fresh }
-                    self.unseen = fresh.filter { $0.date > self.lastSeen }.count
+                    self.unseen = fresh.count
                 }
             }
         }
     }
 
-    /// Called while the Messages tab is on screen.
-    func markSeen() {
-        lastSeen = messages.first?.date ?? .now
-        UserDefaults.standard.set(lastSeen, forKey: "messages.lastSeen")
-        unseen = 0
-    }
-
     func dismiss(_ message: IncomingMessage) {
         dismissed.insert(message.id)
         messages.removeAll { $0.id == message.id }
+        unseen = messages.count
         saveDismissed()
     }
 
     func dismissAll() {
         visible.forEach { dismissed.insert($0.id) }
         messages.removeAll { appFilter == nil || $0.appName == appFilter }
+        unseen = messages.count
         saveDismissed()
     }
 
     func open(_ message: IncomingMessage) {
-        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: message.appID) {
+        if let page = message.url {
+            NSWorkspace.shared.open(page)
+        } else if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: message.appID) {
             NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
         }
     }
@@ -131,6 +144,19 @@ final class MessagesStore: ObservableObject {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
             NSWorkspace.shared.open(url)
         }
+    }
+
+    /// Icon of a source by name: the app's own icon when installed, a symbol for web apps.
+    func icon(forSource name: String) -> NSImage? {
+        if let message = messages.first(where: { $0.appName == name }), message.url == nil {
+            return icon(for: message.appID)
+        }
+        let symbol = name == "Gmail" || name == "Outlook" ? "envelope.fill" : "bubble.left.fill"
+        return NSImage(systemSymbolName: symbol, accessibilityDescription: name)
+    }
+
+    func icon(for message: IncomingMessage) -> NSImage? {
+        message.url == nil ? icon(for: message.appID) : icon(forSource: message.appName)
     }
 
     func icon(for appID: String) -> NSImage? {
@@ -154,12 +180,11 @@ final class MessagesStore: ObservableObject {
         }
         defer { sqlite3_close(db) }
 
-        let ids = messengers.keys.map { "'\($0)'" }.joined(separator: ",")
         let sql = """
         SELECT r.rec_id, a.identifier, r.data, r.delivered_date
         FROM record r JOIN app a ON a.app_id = r.app_id
-        WHERE a.identifier IN (\(ids)) AND r.delivered_date > ?
-        ORDER BY r.delivered_date DESC LIMIT 200
+        WHERE r.delivered_date > ?
+        ORDER BY r.delivered_date DESC LIMIT 400
         """
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else { return nil }
@@ -176,10 +201,25 @@ final class MessagesStore: ObservableObject {
             guard let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
                   let request = plist["req"] as? [String: Any] else { continue }
             let title = request["titl"] as? String ?? ""
+            let subtitle = request["subt"] as? String ?? ""
             let body = request["body"] as? String ?? ""
             guard !title.isEmpty || !body.isEmpty else { continue }
-            found.append(IncomingMessage(id: id, appID: appID, appName: messengers[appID] ?? appID,
-                                         title: title, subtitle: request["subt"] as? String ?? "", body: body, date: date))
+
+            var name = messengers[appID]
+            var page: URL?
+            var shownSubtitle = subtitle
+            if name == nil, browsers.contains(where: { appID.hasPrefix($0) }) {
+                // Browsers put the site in the subtitle or title, e.g. "mail.google.com".
+                let haystack = "\(subtitle) \(title) \(body)".lowercased()
+                if let web = webApps.first(where: { haystack.contains($0.site) }) {
+                    name = web.name
+                    page = URL(string: web.url)
+                    if subtitle.lowercased().contains(web.site) { shownSubtitle = "" }
+                }
+            }
+            guard let name else { continue }
+            found.append(IncomingMessage(id: id, appID: appID, appName: name, title: title, subtitle: shownSubtitle,
+                                         body: body, date: date, url: page))
         }
         return found
     }
