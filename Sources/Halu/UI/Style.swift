@@ -15,6 +15,7 @@ enum Style: String, CaseIterable, Identifiable {
         let hue: (Double, Double, Double)
         switch tab {
         case .tasks: hue = (0.70, 0.64, 1.00)
+        case .finance: hue = (0.35, 0.88, 0.55)
         case .calendar: hue = (1.00, 0.55, 0.50)
         case .claude: hue = (1.00, 0.62, 0.36)
         case .chat: hue = (0.40, 0.85, 0.65)

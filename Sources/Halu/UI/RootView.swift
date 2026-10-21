@@ -102,6 +102,7 @@ struct TabContent: View {
         case .calendar: CalendarView(store: services.calendar)
         case .claude: ClaudeView(store: services.claude)
         case .chat: ChatView(store: services.chat)
+        case .finance: FinanceView(store: services.finance)
         case .weather: WeatherView(weather: services.weather)
         case .clipboard: ClipboardTab(clipboard: services.clipboard, shelf: services.shelf)
         case .translate: TranslateView(store: services.translate, speech: services.speech)

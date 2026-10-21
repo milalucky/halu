@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 enum Tab: String, CaseIterable, Identifiable {
-    case tasks, calendar, claude, chat, weather, jira, gitlab, messages, clipboard, translate, tools, accounts, notes, media, settings
+    case tasks, calendar, finance, claude, chat, weather, jira, gitlab, messages, clipboard, translate, tools, accounts, notes, media, settings
 
     var id: String { rawValue }
 
@@ -12,6 +12,7 @@ enum Tab: String, CaseIterable, Identifiable {
         case .calendar: "Calendar"
         case .claude: "Claude"
         case .chat: "Chat"
+        case .finance: "Money"
         case .weather: "Weather"
         case .clipboard: "Clipboard"
         case .translate: "Translate"
@@ -32,6 +33,7 @@ enum Tab: String, CaseIterable, Identifiable {
         case .calendar: "calendar"
         case .claude: "sparkle"
         case .chat: "bubble.left.circle"
+        case .finance: "creditcard"
         case .weather: "cloud.sun"
         case .clipboard: "doc.on.clipboard"
         case .translate: "character.bubble"
@@ -187,6 +189,7 @@ final class Services {
     let tools = ToolsStore()
     let screenTools = ScreenTools()
     let market = MarketStore()
+    let finance = FinanceStore()
     let gitlab = GitLabStore()
     /// Opens Halu as a normal window that stays open; set by the app delegate.
     var openWindow: () -> Void = {}

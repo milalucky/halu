@@ -57,6 +57,8 @@ Appearance (Settings): Black (default, melts into the notch), Dark Glass, Light 
 
 Settings → Appearance also has Colours (Style: Minimal / Playful / Neon — per-tab colour drives Theme.accent, Neon glows), Panel size (Compact 680×404 / Comfortable 780×440 default / Wide 880×480; Layout.expandedWidth/contentHeight are set by AppModel) and hover delay. Tools modes: Test data, Decode, Compare, Calculator (own safe parser — never NSExpression, it throws ObjC exceptions; units via Measurement; currencies from open.er-api.com), Emoji (Unicode names), Stocks (Yahoo Finance chart endpoint); plus Colour picker, Mirror (camera only while open) and Ruler. Clipboard entries can be pinned. Shelf images are OCR'd (Vision, ru+en) and searchable.
 
+18. Money (Tab.finance) — must-have, and the one feature that will go to iPhone and Apple Watch. Models (MoneyBook, MoneyTransaction, MoneyCategory with keywords and budgets) and StatementParser live in HaluCore so the phone and watch apps can share them; storage is money.json for now (CloudKit later). Quick entry "350 coffee" guesses the category from keywords; changing a category teaches the shop (MoneyBook.learn/merchantKey). Import: CSV (UTF-8 / Windows-1251, ; , or tab) and .xlsx (first sheet via /usr/bin/unzip + XMLParser); header row found by Russian/English column names; failed rows skipped; fingerprints stop duplicates. Overview (spent/income/left, donut, by-day bars), Transactions (search, recategorize), Budget (monthly + per-category limits).
+
 Tabs are configurable in Settings (gear): all on by default; a disabled tab hides from the sidebar, pauses its store's background work (`isActive`), and drops its notch indicators.
 
 ## Roadmap
