@@ -20,7 +20,7 @@ Native SwiftUI + AppKit app that lives in the MacBook notch and in a virtual not
 4. Shelf — files, screenshots and screen recordings (watches the system screenshot folder).
 5. Clipboard + Snippets (one tab).
 6. Translate — Google Translate EN↔RU, dictate by voice, copy the translation.
-7. Accounts — test accounts table (Service · Login · Password · Notes) in an AES-GCM vault file, key in Keychain. Import: Markdown lists/tables, CSV/TSV, clipboard rows (AccountImport), or `Halu --import-accounts <file>`. Service chips filter by service; combined services ("losolo, losolo3", "StarSteer — losolo2") count for each part, URLs/hosts left out. Never commit account files.
+7. Accounts — test accounts table (Service · Login · Password · Notes) in an AES-GCM vault file, key in Keychain. Import: Markdown lists/tables, CSV/TSV, clipboard rows (AccountImport), or `Halu --import-accounts <file>`. A service dropdown next to search filters by service; combined services ("losolo, losolo3", "StarSteer — losolo2") count for each part, URLs/hosts left out. Never commit account files.
 8. Notes.
 9. Media — now playing, music and any video, last.
 

@@ -38,6 +38,9 @@ struct AccountsView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 InputField(placeholder: "Search service, login or note", icon: "magnifyingglass", text: $query)
+                if store.serviceTags.count > 1 {
+                    ServiceMenu(store: store, count: count)
+                }
                 Menu {
                     Button("From a file…  (Markdown, CSV)") {
                         if let added = store.chooseFileToImport() { report(added) }
@@ -59,19 +62,6 @@ struct AccountsView: View {
                         store.editing = Account(service: query, login: "", password: "", notes: "")
                     }
                 }
-            }
-            if store.serviceTags.count > 1 {
-                ScrollView(.horizontal) {
-                    HStack(spacing: 6) {
-                        ServiceChip(title: "All", count: store.accounts.count, selected: store.serviceFilter == nil) { store.serviceFilter = nil }
-                        ForEach(store.serviceTags, id: \.self) { tag in
-                            ServiceChip(title: tag, count: count(tag), selected: store.serviceFilter?.caseInsensitiveCompare(tag) == .orderedSame) {
-                                store.serviceFilter = store.serviceFilter == tag ? nil : tag
-                            }
-                        }
-                    }
-                }
-                .scrollIndicators(.never)
             }
             if let importNote {
                 Text(importNote).font(Theme.caption(11, weight: .medium)).foregroundStyle(Theme.accent)
@@ -117,25 +107,46 @@ struct AccountsView: View {
     }
 }
 
-private struct ServiceChip: View {
-    let title: String
-    let count: Int
-    let selected: Bool
-    let action: () -> Void
+/// Which service to show: all, or one (with how many accounts each has).
+private struct ServiceMenu: View {
+    @ObservedObject var store: AccountStore
+    let count: (String) -> Int
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 4) {
-                Text(title)
-                Text("\(count)").foregroundStyle(selected ? Color.black.opacity(0.5) : Theme.tertiary)
+        Menu {
+            Button {
+                store.serviceFilter = nil
+            } label: {
+                if store.serviceFilter == nil { Label("All  \(store.accounts.count)", systemImage: "checkmark") } else { Text("All  \(store.accounts.count)") }
             }
-            .font(Theme.caption(11.5, weight: .semibold))
-            .foregroundStyle(selected ? Color.black.opacity(0.85) : Theme.secondary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(Capsule().fill(selected ? Theme.primary : Theme.card))
+            Divider()
+            ForEach(store.serviceTags, id: \.self) { tag in
+                Button {
+                    store.serviceFilter = tag
+                } label: {
+                    if store.serviceFilter?.caseInsensitiveCompare(tag) == .orderedSame {
+                        Label("\(tag)  \(count(tag))", systemImage: "checkmark")
+                    } else {
+                        Text("\(tag)  \(count(tag))")
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Text(store.serviceFilter ?? "All services").lineLimit(1)
+                Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
+            }
+            .font(Theme.caption(12, weight: .semibold))
+            .foregroundStyle(store.serviceFilter == nil ? Theme.secondary : Theme.primary)
+            .padding(.horizontal, 12)
+            .frame(height: 32)
+            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(store.serviceFilter == nil ? Theme.card : Theme.cardHover))
         }
+        .menuStyle(.button)
         .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Show one service")
     }
 }
 
@@ -153,7 +164,7 @@ private struct AccountRow: View {
                     store.copyPlain(account.login)
                     flash("login")
                 }
-                .frame(width: 170, alignment: .leading)
+                .frame(width: 230, alignment: .leading)
 
                 CopyCell(text: account.password, display: revealed ? account.password : String(repeating: "•", count: 8),
                          copied: copied == "password", mono: true) {
@@ -275,3 +286,4 @@ private struct AccountEditor: View {
             .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Color.white.opacity(0.05)))
     }
 }
+
