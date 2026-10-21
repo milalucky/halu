@@ -27,10 +27,12 @@ Native SwiftUI + AppKit app that lives in the MacBook notch and in a virtual not
 Next, after Media:
 
 10. Jira — done: Mine / Sprint / status queue (any assignee), projects auto-discovered (no hardcoded keys — the app must suit anyone), Start + any transition.
-11. Messages — done. Sources: open browser tabs of Slack/Gmail/Telegram Web read via AppleScript JS every 20 s (WebInbox): Slack keeps only DMs and channels with a mention badge (incl. @channel/@here), Gmail rows labelled with their inbox address (from the tab title), Telegram only the chosen chat folder (menu in the tab; only the open folder's list is rendered, otherwise the folder badge count). Message text comes from matching notifications. Other apps: macOS notification database (Full Disk Access), read = its app was in front after the message. No IMAP/passwords: the user doesn't want logins for mail. Rows carry a thin source colour, no app icons.
+11. Messages — done. Sources: open browser tabs read via AppleScript JS every 20 s (WebInbox; two passes: the first starts async work in the page, the second collects it): Slack through the page's own session (`client.counts`, `conversations.history`, names cached in the page) — every unread channel, DMs/mentions flagged, menu "All unread / Mentions & DMs"; Telegram Web K from the page's IndexedDB (`tweb-account-N`, dialogs carry `index_<folder localId>`), any folder via the menu; Gmail unread rows of the open list, labelled with the inbox (from the tab title), menu per inbox. A tab that misses a read keeps its list for 2 min. Scripts are sent as one line: never use `//` comments in them. Other apps: macOS notification database (Full Disk Access). No IMAP/passwords. Rows carry a thin source colour, no app icons.
 12. Integrations screen in settings: Jira token (Keychain); Slack, Gmail, Telegram show "Connected" when their tab is open.
 
-Collapsed notch indicator: one small glowing circle with the icon of the app that is waiting (Claude first), no counts.
+Collapsed notch indicator: just the Halu mark in orange with a soft glow, no backing, no counts.
+
+Secrets live in ONE Keychain item (`com.milana.halu.secrets`), read once per launch: every local rebuild changes the code identity, so macOS asks once per item.
 13. Quick actions next to Keep Awake: VPN on/off first.
 
 Tabs are configurable in Settings (gear): all on by default; a disabled tab hides from the sidebar, pauses its store's background work (`isActive`), and drops its notch indicators.

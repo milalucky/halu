@@ -26,7 +26,7 @@ final class AccountStore: ObservableObject {
 
     func start() {
         do {
-            let key = try Vault.loadOrCreateKey()
+            let key = try Vault.loadOrCreateKey(vaultExists: FileManager.default.fileExists(atPath: url.path))
             self.key = key
             if let data = try? Data(contentsOf: url) {
                 let plain = try AES.GCM.open(AES.GCM.SealedBox(combined: data), using: key)
@@ -34,7 +34,7 @@ final class AccountStore: ObservableObject {
             }
             problem = nil
         } catch {
-            problem = "Halu couldn't unlock your accounts. Allow access to the Keychain item “Halu Vault” and reopen Halu."
+            problem = "Halu couldn't unlock your accounts. Allow access to the Keychain item “Halu” and reopen Halu."
         }
     }
 
@@ -108,38 +108,20 @@ final class AccountStore: ObservableObject {
 }
 
 private enum Vault {
-    static let service = "com.milana.halu.vault"
-    static let account = "Halu Vault"
+    static let key = "vault-key"
 
-    static func loadOrCreateKey() throws -> SymmetricKey {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
-        var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
-        if status == errSecSuccess, let data = item as? Data {
+    /// The vault's key from Halu's Keychain item. A new key is made only for a vault that doesn't exist yet.
+    static func loadOrCreateKey(vaultExists: Bool) throws -> SymmetricKey {
+        if let encoded = Keychain.read(key), let data = Data(base64Encoded: encoded) {
             return SymmetricKey(data: data)
         }
-        guard status == errSecItemNotFound else { throw VaultError.keychain(status) }
-
-        let key = SymmetricKey(size: .bits256)
-        let data = key.withUnsafeBytes { Data($0) }
-        let add: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecAttrLabel as String: account,
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
-        ]
-        let added = SecItemAdd(add as CFDictionary, nil)
-        guard added == errSecSuccess else { throw VaultError.keychain(added) }
-        return key
+        guard Keychain.isReadable, !vaultExists else { throw VaultError.keychainUnavailable }
+        let fresh = SymmetricKey(size: .bits256)
+        guard Keychain.write(fresh.withUnsafeBytes { Data($0) }.base64EncodedString(), for: key) else {
+            throw VaultError.keychainUnavailable
+        }
+        return fresh
     }
 
-    enum VaultError: Error { case keychain(OSStatus) }
+    enum VaultError: Error { case keychainUnavailable }
 }

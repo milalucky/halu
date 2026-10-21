@@ -29,9 +29,7 @@ struct MessagesView: View {
                     }
                 }
                 Spacer()
-                if store.telegramFolders.count > 1 {
-                    TelegramFolderMenu(store: store)
-                }
+                SourceOptions(store: store)
                 if !store.visible.isEmpty {
                     Button("Clear") { withAnimation { store.dismissAll() } }
                         .buttonStyle(.plain)
@@ -90,23 +88,50 @@ private struct FilterChip: View {
     }
 }
 
-/// Which Telegram folder Messages follows, from the folders of the Telegram Web tab.
-private struct TelegramFolderMenu: View {
+/// Options of the selected source: Telegram folder, Gmail inbox, Slack scope.
+private struct SourceOptions: View {
     @ObservedObject var store: MessagesStore
 
     var body: some View {
+        switch store.appFilter {
+        case "Telegram" where store.telegramFolders.count > 1:
+            let current = store.telegramFolder.isEmpty ? "All" : store.telegramFolder
+            OptionsMenu(source: "Telegram", title: current, help: "Telegram folder to follow",
+                        options: store.telegramFolders.map { folder in
+                            (folder, folder.lowercased() == current.lowercased(), { store.telegramFolder = folder == "All" ? "" : folder })
+                        })
+        case "Gmail" where store.gmailAccounts.count > 1 || !store.gmailAccount.isEmpty:
+            OptionsMenu(source: "Gmail", title: store.gmailAccount.isEmpty ? "All inboxes" : store.gmailAccount, help: "Gmail inbox to follow",
+                        options: [("All inboxes", store.gmailAccount.isEmpty, { store.gmailAccount = "" })]
+                            + store.gmailAccounts.map { email in (email, email == store.gmailAccount, { store.gmailAccount = email }) })
+        case "Slack":
+            OptionsMenu(source: "Slack", title: store.slackOnlyPersonal ? "Mentions & DMs" : "All unread", help: "What to show from Slack",
+                        options: [("All unread", !store.slackOnlyPersonal, { store.slackOnlyPersonal = false }),
+                                  ("Mentions & DMs", store.slackOnlyPersonal, { store.slackOnlyPersonal = true })])
+        default:
+            EmptyView()
+        }
+    }
+}
+
+private struct OptionsMenu: View {
+    let source: String
+    let title: String
+    let help: String
+    let options: [(String, Bool, () -> Void)]
+
+    var body: some View {
         Menu {
-            ForEach(store.telegramFolders, id: \.self) { folder in
-                Button {
-                    store.telegramFolder = folder
-                } label: {
-                    if folder.lowercased() == current.lowercased() { Label(folder, systemImage: "checkmark") } else { Text(folder) }
+            ForEach(options.indices, id: \.self) { index in
+                let option = options[index]
+                Button(action: option.2) {
+                    if option.1 { Label(option.0, systemImage: "checkmark") } else { Text(option.0) }
                 }
             }
         } label: {
             HStack(spacing: 4) {
-                Circle().fill(SourceColor.of("Telegram")).frame(width: 6, height: 6)
-                Text(current)
+                Circle().fill(SourceColor.of(source)).frame(width: 6, height: 6)
+                Text(title)
                 Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
             }
             .font(Theme.caption(11.5, weight: .medium))
@@ -115,11 +140,7 @@ private struct TelegramFolderMenu: View {
         .menuStyle(.button)
         .buttonStyle(.plain)
         .fixedSize()
-        .help("Telegram folder to follow")
-    }
-
-    private var current: String {
-        store.telegramFolder.isEmpty ? (store.telegramFolders.first ?? "All") : store.telegramFolder
+        .help(help)
     }
 }
 
@@ -142,7 +163,10 @@ private struct MessageRow: View {
                             .foregroundStyle(Theme.primary)
                             .lineLimit(1)
                         if !message.subtitle.isEmpty {
-                            Text(message.subtitle).font(Theme.caption(11, weight: .regular)).foregroundStyle(Theme.tertiary).lineLimit(1)
+                            Text(message.subtitle)
+                                .font(Theme.caption(11, weight: message.isPersonal ? .semibold : .regular))
+                                .foregroundStyle(message.isPersonal ? Theme.accent : Theme.tertiary)
+                                .lineLimit(1)
                         }
                         Spacer(minLength: 4)
                         if hovering {

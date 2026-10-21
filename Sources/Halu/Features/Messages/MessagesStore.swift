@@ -13,6 +13,8 @@ struct IncomingMessage: Identifiable, Equatable {
     var url: URL?
     /// Set for unread state read from an open browser tab; opening switches to that tab.
     var web: WebInbox.Item?
+    /// A direct message or a mention.
+    var isPersonal = false
 }
 
 /// Unread messages from Slack, Telegram, mail and other messengers, read from the notifications macOS
@@ -39,7 +41,23 @@ final class MessagesStore: ObservableObject {
     @Published var telegramFolder = UserDefaults.standard.string(forKey: "messages.telegramFolder") ?? "" {
         didSet {
             UserDefaults.standard.set(telegramFolder, forKey: "messages.telegramFolder")
+            web.removeAll { $0.appName == "Telegram" }
+            merge()
             readWebTabs()
+        }
+    }
+    /// The Gmail inbox Messages follows ("" = every open inbox).
+    @Published var gmailAccount = UserDefaults.standard.string(forKey: "messages.gmailAccount") ?? "" {
+        didSet {
+            UserDefaults.standard.set(gmailAccount, forKey: "messages.gmailAccount")
+            merge()
+        }
+    }
+    /// Slack: only direct messages and mentions, or every unread channel.
+    @Published var slackOnlyPersonal = UserDefaults.standard.bool(forKey: "messages.slackOnlyPersonal") {
+        didSet {
+            UserDefaults.standard.set(slackOnlyPersonal, forKey: "messages.slackOnlyPersonal")
+            merge()
         }
     }
 
@@ -87,8 +105,11 @@ final class MessagesStore: ObservableObject {
     /// Unread conversations read from open Slack, Gmail and Telegram tabs, and the sites those tabs cover.
     private var web: [IncomingMessage] = []
     private var webCovered: Set<String> = []
+    /// When each site last answered; a site that misses one read keeps its list for a while.
+    private var webAnswered: [String: Date] = [:]
     private let webInbox = WebInbox()
     private var webTimer: Timer?
+    private var webRetry: DispatchWorkItem?
     /// When each web item was first seen, so the list has a sensible order and "x min ago".
     private var firstSeen: [String: Date] = UserDefaults.standard.dictionary(forKey: "messages.firstSeen") as? [String: Date] ?? [:]
     private var timer: Timer?
@@ -145,36 +166,57 @@ final class MessagesStore: ObservableObject {
             return
         }
         webInbox.read(browsers: Array(browsers), telegramFolder: telegramFolder) { [weak self] snapshot in
-            guard let self else { return }
-            let now = Date()
-            var seen = self.firstSeen.filter { key, _ in snapshot.items.contains { $0.key == key } }
-            self.web = snapshot.items.map { item in
-                let date = seen[item.key] ?? now
-                seen[item.key] = date
-                // Gmail rows say which inbox; Slack and Telegram say why they're here.
-                let context = item.site == .gmail ? item.account : ""
-                var message = IncomingMessage(id: Self.stableID(item.key), appID: item.bundleID, appName: item.site.rawValue,
-                                              title: item.title, subtitle: context, body: item.detail, date: date, url: nil, web: item)
-                // A notification for the same conversation gives what was actually said.
-                let plain = item.title.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
-                if let preview = self.notifications.first(where: { $0.appName == item.site.rawValue && $0.title.contains(plain) }) {
-                    message.subtitle = context.isEmpty ? item.detail : context
-                    message.body = preview.body
-                    message.date = max(date, preview.date)
-                }
-                return message
-            }
-            self.firstSeen = seen
-            UserDefaults.standard.set(seen, forKey: "messages.firstSeen")
-            self.webCovered = Set(snapshot.covered.map(\.rawValue))
-            let accounts = Dictionary(uniqueKeysWithValues: snapshot.covered.map { ($0.rawValue, snapshot.accounts[$0] ?? []) })
-            if accounts != self.webAccounts { self.webAccounts = accounts }
-            if snapshot.covered.contains(.telegram), snapshot.telegramFolders != self.telegramFolders {
-                self.telegramFolders = snapshot.telegramFolders
-            }
-            self.merge()
+            self?.apply(snapshot)
         }
     }
+
+    private func apply(_ snapshot: WebInbox.Snapshot) {
+        let now = Date()
+        var answered = Set(snapshot.covered.subtracting(snapshot.pending).map(\.rawValue))
+        for site in answered { webAnswered[site] = now }
+        // A tab that's slow, loading or asleep for one read keeps what it showed, for up to two minutes.
+        let holding = Set(webAnswered.filter { !answered.contains($0.key) && now.timeIntervalSince($0.value) < 120 }.keys)
+        var seen = firstSeen.filter { key, _ in snapshot.items.contains { $0.key == key } || web.contains { $0.web?.key == key } }
+        let fresh = snapshot.items.map { item -> IncomingMessage in
+            let first = seen[item.key] ?? now
+            seen[item.key] = first
+            var message = IncomingMessage(id: Self.stableID(item.key), appID: item.bundleID, appName: item.site.rawValue,
+                                          title: item.title, subtitle: item.site == .gmail ? item.account : item.detail,
+                                          body: item.text.isEmpty ? item.detail : item.text, date: item.date ?? first,
+                                          url: nil, web: item, isPersonal: item.isPersonal)
+            if item.text.isEmpty {
+                // A notification for the same conversation tells what was said.
+                let plain = item.title.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+                if let preview = notifications.first(where: { $0.appName == item.site.rawValue && $0.title.contains(plain) }) {
+                    message.body = preview.body
+                    message.date = max(message.date, preview.date)
+                }
+            }
+            return message
+        }
+        web = fresh.filter { answered.contains($0.appName) } + web.filter { holding.contains($0.appName) }
+        firstSeen = seen
+        UserDefaults.standard.set(seen, forKey: "messages.firstSeen")
+        webCovered = Set(snapshot.covered.map(\.rawValue)).union(holding)
+        var accounts = webAccounts.filter { holding.contains($0.key) }
+        for site in snapshot.covered { accounts[site.rawValue] = snapshot.accounts[site] ?? webAccounts[site.rawValue] ?? [] }
+        if accounts != webAccounts { webAccounts = accounts }
+        if snapshot.covered.contains(.telegram), !snapshot.telegramFolders.isEmpty, snapshot.telegramFolders != telegramFolders {
+            telegramFolders = snapshot.telegramFolders
+        }
+        merge()
+        // A tab read for the first time has its answer a moment later.
+        if snapshot.pending.contains(where: { webAnswered[$0.rawValue] == nil }), webRetry == nil {
+            webRetry = DispatchWorkItem { [weak self] in
+                self?.webRetry = nil
+                self?.readWebTabs()
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4, execute: webRetry!)
+        }
+    }
+
+    /// Gmail inboxes seen in open tabs.
+    var gmailAccounts: [String] { webAccounts["Gmail"] ?? [] }
 
     private static func stableID(_ key: String) -> Int64 {
         // FNV-1a, kept positive and above notification record ids.
@@ -211,7 +253,12 @@ final class MessagesStore: ObservableObject {
 
     /// One list, newest first: an open browser tab wins over notifications for its service.
     private func merge() {
-        let fromWeb = web.filter { !dismissed.contains($0.id) }
+        let fromWeb = web.filter { message in
+            guard !dismissed.contains(message.id) else { return false }
+            if message.appName == "Gmail", !gmailAccount.isEmpty, message.web?.account != gmailAccount { return false }
+            if message.appName == "Slack", slackOnlyPersonal, !message.isPersonal { return false }
+            return true
+        }
         let fromNotifications = notifications.filter { !webCovered.contains($0.appName) }
         let combined = (fromNotifications + fromWeb).sorted { $0.date > $1.date }
         if combined != messages { messages = combined }

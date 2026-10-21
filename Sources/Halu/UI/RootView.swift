@@ -52,8 +52,7 @@ struct RootView: View {
                     .transition(.opacity.animation(.easeOut(duration: 0.2)))
             }
         case .badge:
-            BadgeView(image: claudeWaiting > 0 ? BadgeView.claudeIcon : messages.unseenApps.first.flatMap(messages.icon(forSource:)),
-                      claude: claudeWaiting > 0) {
+            BadgeView {
                 actions.open(services.attentionTab)
             }
                 .transition(.opacity)
@@ -290,19 +289,16 @@ struct AwakeButton: View {
     }
 }
 
-/// Collapsed notch with one small lit circle beside it: the icon of the app that's waiting for you,
-/// Claude first, then the newest unread source. No counts, nothing else.
+/// Collapsed notch with Halu's mark beside it, lit orange: something is waiting (unread messages or
+/// Claude). No counts, nothing else.
 struct BadgeView: View {
-    let image: NSImage?
-    let claude: Bool
     let onTap: () -> Void
-
-    static let claudeIcon: NSImage? = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.anthropic.claudefordesktop")
-        .map { NSWorkspace.shared.icon(forFile: $0.path) }
+    @State private var glow = false
 
     var body: some View {
         HStack(spacing: 0) {
-            GlowingIcon(image: image, claude: claude)
+            HaluMark(size: 14, color: Theme.orange, animating: false)
+                .shadow(color: Theme.orange.opacity(glow ? 0.7 : 0.15), radius: glow ? 5 : 2)
                 .frame(width: Layout.badgeWing)
             Spacer(minLength: 0)
             Color.clear.frame(width: Layout.badgeWing)
@@ -311,32 +307,6 @@ struct BadgeView: View {
         .frame(maxHeight: .infinity)
         .contentShape(Rectangle())
         .onTapGesture(perform: onTap)
-    }
-}
-
-/// An app icon in a small dark circle with a soft breathing glow, as if it's lit from behind.
-private struct GlowingIcon: View {
-    let image: NSImage?
-    let claude: Bool
-    @State private var glow = false
-
-    var body: some View {
-        let tint = claude ? Theme.orange : Theme.accent
-        ZStack {
-            Circle().fill(Color.white.opacity(0.1))
-            if let image, image.isTemplate {
-                // Symbols (web apps without a desktop app) are drawn in the glow colour.
-                Image(nsImage: image).renderingMode(.template).resizable().scaledToFit().frame(width: 10, height: 10).foregroundStyle(tint)
-            } else if let image {
-                Image(nsImage: image).resizable().interpolation(.high).frame(width: 14, height: 14)
-            } else if claude {
-                HaluMark(size: 10, color: Theme.orange, animating: true)
-            } else {
-                Image(systemName: "bubble.left.fill").font(.system(size: 8, weight: .bold)).foregroundStyle(Theme.accent)
-            }
-        }
-        .frame(width: 20, height: 20)
-        .shadow(color: tint.opacity(glow ? 0.8 : 0.2), radius: glow ? 5 : 2)
         .onAppear {
             withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) { glow = true }
         }
