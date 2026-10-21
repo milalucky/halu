@@ -33,7 +33,7 @@ Next, after Media:
 Collapsed notch indicator: just the Halu mark in orange with a soft glow, no backing, no counts.
 
 Secrets live in ONE Keychain item (`com.milana.halu.secrets`), read once per launch: every local rebuild changes the code identity, so macOS asks once per item.
-13. Quick actions next to Keep Awake: VPN on/off first.
+13. Quick actions next to Keep Awake. VPN switcher done (Features/VPN): click lists every server grouped by app, picking one switches to it. Sources: `scutil --nc` (Outline and other system VPNs), Pritunl via its own `pritunl-client` CLI (system profiles only: GUI-only profiles keep their keys encrypted by the Pritunl app — never decrypt them), AmneziaVPN has no outside control (Open app).
 
 Tabs are configurable in Settings (gear): all on by default; a disabled tab hides from the sidebar, pauses its store's background work (`isActive`), and drops its notch indicators.
 

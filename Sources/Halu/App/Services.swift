@@ -94,6 +94,7 @@ final class Services {
     let messages = MessagesStore()
     let speech = SpeechInput()
     let awake = AwakeController()
+    let vpn = VPNController()
 
     /// Something waiting for the user, shown on the collapsed notch: Claude first, then unread messages.
     var claudeWaiting: Int { model.isEnabled(.claude) ? claude.attention.count : 0 }
@@ -133,5 +134,6 @@ final class Services {
         media.start()
         jira.start()
         messages.start()
+        vpn.start()
     }
 }
