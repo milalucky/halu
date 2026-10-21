@@ -27,8 +27,10 @@ Native SwiftUI + AppKit app that lives in the MacBook notch and in a virtual not
 Next, after Media:
 
 10. Jira — done: Mine / Sprint / status queue (any assignee), projects auto-discovered (no hardcoded keys — the app must suit anyone), Start + any transition.
-11. Messages — done. Sources by truthfulness: IMAP for the connected inbox (MailStore, read-only EXAMINE + BODY.PEEK); open browser tabs of Slack/Gmail/Telegram Web read via AppleScript JS every 20 s (WebInbox: Slack `.p-channel_sidebar__channel--unread`, Gmail `tr.zA.zE`, Telegram K `.chatlist-chat` badges); otherwise macOS notification database (Full Disk Access). Read = its app or its site's active browser tab was in front after the message (visits tracked every 2 s), or notification gone; up to 7 days; browser notifications mapped to web apps by site (Gmail, Telegram Web…).
-12. Integrations screen in settings for API keys/tokens (Jira, Slack, …), stored in Keychain.
+11. Messages — done. Sources: open browser tabs of Slack/Gmail/Telegram Web read via AppleScript JS every 20 s (WebInbox): Slack keeps only DMs and channels with a mention badge (incl. @channel/@here), Gmail rows labelled with their inbox address (from the tab title), Telegram only the chosen chat folder (menu in the tab; only the open folder's list is rendered, otherwise the folder badge count). Message text comes from matching notifications. Other apps: macOS notification database (Full Disk Access), read = its app was in front after the message. No IMAP/passwords: the user doesn't want logins for mail. Rows carry a thin source colour, no app icons.
+12. Integrations screen in settings: Jira token (Keychain); Slack, Gmail, Telegram show "Connected" when their tab is open.
+
+Collapsed notch indicator: one small glowing circle with the icon of the app that is waiting (Claude first), no counts.
 13. Quick actions next to Keep Awake: VPN on/off first.
 
 Tabs are configurable in Settings (gear): all on by default; a disabled tab hides from the sidebar, pauses its store's background work (`isActive`), and drops its notch indicators.
