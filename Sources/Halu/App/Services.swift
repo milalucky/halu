@@ -273,6 +273,8 @@ final class Services {
         jira.start()
         messages.start()
         vpn.start()
+        finance.rates = { [market] in market.rates }
+        market.loadRates()
         gitlab.isActive = { model.isEnabled(.gitlab) }
         gitlab.onPipelineFinished = { [notices] pipeline in
             Stats.shared.log(.pipeline, key: String(pipeline.id))

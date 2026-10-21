@@ -14,14 +14,48 @@ public struct MoneyCategory: Codable, Identifiable, Equatable, Hashable {
     public var budget: Double?
     /// Lower-case words that put a transaction here when they appear in its description.
     public var keywords: [String]
+    /// Hidden categories stay on old transactions but aren't offered for new ones.
+    public var hidden: Bool
 
-    public init(id: String, name: String, emoji: String, kind: Kind, budget: Double? = nil, keywords: [String] = []) {
+    public init(id: String, name: String, emoji: String, kind: Kind, budget: Double? = nil, keywords: [String] = [], hidden: Bool = false) {
         self.id = id
         self.name = name
         self.emoji = emoji
         self.kind = kind
         self.budget = budget
         self.keywords = keywords
+        self.hidden = hidden
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        emoji = try c.decode(String.self, forKey: .emoji)
+        kind = try c.decode(Kind.self, forKey: .kind)
+        budget = try c.decodeIfPresent(Double.self, forKey: .budget)
+        keywords = try c.decodeIfPresent([String].self, forKey: .keywords) ?? []
+        hidden = try c.decodeIfPresent(Bool.self, forKey: .hidden) ?? false
+    }
+}
+
+/// Something expected this month: a salary, rent, a subscription. Repeats every month.
+public struct PlanItem: Codable, Identifiable, Equatable {
+    public var id: UUID
+    public var title: String
+    public var amount: Double
+    public var isIncome: Bool
+    public var categoryID: String
+    /// Day of the month it usually happens, if known.
+    public var day: Int?
+
+    public init(id: UUID = UUID(), title: String, amount: Double, isIncome: Bool, categoryID: String, day: Int? = nil) {
+        self.id = id
+        self.title = title
+        self.amount = amount
+        self.isIncome = isIncome
+        self.categoryID = categoryID
+        self.day = day
     }
 }
 
@@ -60,13 +94,29 @@ public struct MoneyBook: Codable, Equatable {
     /// Monthly spending budget in the base currency; nil means none.
     public var monthlyBudget: Double?
     public var baseCurrency: String
+    /// The monthly plan: expected income and regular payments.
+    public var plan: [PlanItem]
+    /// How much to put aside each month.
+    public var savingsGoal: Double?
 
     public init(transactions: [MoneyTransaction] = [], categories: [MoneyCategory] = MoneyBook.defaultCategories,
-                monthlyBudget: Double? = nil, baseCurrency: String = "RUB") {
+                monthlyBudget: Double? = nil, baseCurrency: String = "RUB", plan: [PlanItem] = [], savingsGoal: Double? = nil) {
         self.transactions = transactions
         self.categories = categories
         self.monthlyBudget = monthlyBudget
         self.baseCurrency = baseCurrency
+        self.plan = plan
+        self.savingsGoal = savingsGoal
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        transactions = try c.decodeIfPresent([MoneyTransaction].self, forKey: .transactions) ?? []
+        categories = try c.decodeIfPresent([MoneyCategory].self, forKey: .categories) ?? MoneyBook.defaultCategories
+        monthlyBudget = try c.decodeIfPresent(Double.self, forKey: .monthlyBudget)
+        baseCurrency = try c.decodeIfPresent(String.self, forKey: .baseCurrency) ?? "RUB"
+        plan = try c.decodeIfPresent([PlanItem].self, forKey: .plan) ?? []
+        savingsGoal = try c.decodeIfPresent(Double.self, forKey: .savingsGoal)
     }
 
     public func category(_ id: String) -> MoneyCategory? { categories.first { $0.id == id } }
@@ -75,7 +125,7 @@ public struct MoneyBook: Codable, Equatable {
     public func guessCategory(for text: String, income: Bool) -> String {
         let haystack = text.lowercased()
         var best: (id: String, length: Int)?
-        for category in categories where (category.kind == .income) == income {
+        for category in categories where (category.kind == .income) == income && !category.hidden {
             for word in category.keywords where !word.isEmpty && haystack.contains(word) {
                 if word.count > (best?.length ?? 0) { best = (category.id, word.count) }
             }
@@ -110,7 +160,7 @@ public struct MoneyBook: Codable, Equatable {
         MoneyCategory(id: "cafes", name: "Cafés & food", emoji: "☕️", kind: .expense, keywords: [
             "кафе", "cafe", "coffee", "кофе", "ресторан", "restaurant", "starbucks", "шоколадница", "додо", "dodo", "kfc",
             "ростикс", "вкусно и точка", "бургер", "burger", "макдоналдс", "теремок", "суши", "sushi", "pizza", "пицца",
-            "delivery club", "яндекс еда", "yandex eda", "eda.yandex", "кулинария", "столовая", "bar ", "бар ", "bakery", "пекарня", "фастфуд", "рестора"]),
+            "delivery club", "яндекс еда", "yandex eda", "eda.yandex", "кулинария", "столовая", "bar ", "бар ", "bakery", "пекарня", "фастфуд", "рестора", "обед", "ужин", "завтрак", "lunch", "dinner", "breakfast"]),
         MoneyCategory(id: "transport", name: "Transport", emoji: "🚕", kind: .expense, keywords: [
             "такси", "taxi", "uber", "яндекс go", "yandex go", "ситимобил", "метро", "metro moscow", "транспорт", "тройка",
             "мцд", "автобус", "аэроэкспресс", "ржд", "rzd", "азс", "лукойл", "газпромнефть", "роснефть", "shell", "парковка",

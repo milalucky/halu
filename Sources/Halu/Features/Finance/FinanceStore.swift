@@ -7,7 +7,7 @@ import UniformTypeIdentifiers
 @MainActor
 final class FinanceStore: ObservableObject {
     enum Mode: String, CaseIterable, Identifiable {
-        case overview = "Overview", transactions = "Transactions", budget = "Budget"
+        case overview = "Overview", transactions = "Transactions", plan = "Plan", categories = "Categories"
         var id: String { rawValue }
     }
 
@@ -30,23 +30,78 @@ final class FinanceStore: ObservableObject {
 
     var currency: String { book.baseCurrency }
 
+    /// Rates against the US dollar, from the Tools market data; used to count other currencies in roubles.
+    var rates: () -> [String: Double] = { [:] }
+
+    /// An amount in the base currency (as is, when the rate isn't known yet).
+    func inBase(_ amount: Double, _ code: String) -> Double {
+        guard code != currency else { return amount }
+        let rates = rates()
+        guard let from = rates[code], let to = rates[currency], from > 0 else { return amount }
+        return amount / from * to
+    }
+
+    func inBase(_ transaction: MoneyTransaction) -> Double { inBase(transaction.amount, transaction.currency) }
+
+    /// Categories offered for new entries of one kind.
+    func choices(income: Bool) -> [MoneyCategory] {
+        book.categories.filter { ($0.kind == .income) == income && !$0.hidden }
+    }
+
+    /// The categories used most for this kind, for one-click picking.
+    func frequent(income: Bool, limit: Int = 6) -> [MoneyCategory] {
+        var counts: [String: Int] = [:]
+        for transaction in book.transactions.suffix(400) where transaction.isIncome == income { counts[transaction.categoryID, default: 0] += 1 }
+        let ranked = choices(income: income).sorted { (counts[$0.id] ?? 0) > (counts[$1.id] ?? 0) }
+        return Array(ranked.prefix(limit))
+    }
+
     // MARK: Entering
 
-    /// "350 кофе" → 350, note "кофе", category guessed from "кофе" (or the one picked).
-    var parsedDraft: (amount: Double, note: String, category: String)? {
-        let text = draft.trimmingCharacters(in: .whitespaces)
-        guard let match = text.range(of: #"^[+-]?\d+([.,]\d+)?"#, options: .regularExpression)
-                ?? text.range(of: #"[+-]?\d+([.,]\d+)?$"#, options: .regularExpression),
+    private static let currencyWords: [String: String] = [
+        "$": "USD", "usd": "USD", "долл": "USD", "доллар": "USD", "€": "EUR", "eur": "EUR", "евро": "EUR",
+        "₽": "RUB", "rub": "RUB", "руб": "RUB", "р": "RUB", "₸": "KZT", "kzt": "KZT", "тенге": "KZT",
+        "£": "GBP", "gbp": "GBP", "¥": "CNY", "cny": "CNY", "юань": "CNY", "₺": "TRY", "try": "TRY", "aed": "AED", "дирхам": "AED",
+    ]
+
+    /// "350 кофе", "$100 salary", "+85000 зарплата", "1200 руб такси": amount, currency, note and category.
+    var parsedDraft: (amount: Double, currency: String, note: String, category: String)? {
+        var text = draft.trimmingCharacters(in: .whitespaces)
+        var code = currency
+        // A currency sign or word anywhere in the line.
+        for (word, value) in Self.currencyWords.sorted(by: { $0.key.count > $1.key.count }) {
+            let pattern = word.count == 1 && !word.first!.isLetter
+                ? NSRegularExpression.escapedPattern(for: word)
+                : #"(?<![\p{L}])"# + NSRegularExpression.escapedPattern(for: word) + #"\.?(?![\p{L}])"#
+            if let range = text.range(of: pattern, options: [.regularExpression, .caseInsensitive]) {
+                code = value
+                text.replaceSubrange(range, with: " ")
+                break
+            }
+        }
+        text = text.trimmingCharacters(in: .whitespaces)
+        guard let match = text.range(of: #"^[+-]?\d[\d\s]*([.,]\d+)?"#, options: .regularExpression)
+                ?? text.range(of: #"[+-]?\d[\d\s]*([.,]\d+)?$"#, options: .regularExpression),
               let amount = StatementParser.parseNumber(String(text[match])), amount != 0 else { return nil }
         let note = text.replacingCharacters(in: match, with: "").trimmingCharacters(in: .whitespaces)
-        let income = draftIncome || text.hasPrefix("+")
-        return (abs(amount), note, draftCategory ?? book.guessCategory(for: note, income: income))
+        let income = isIncomeDraft
+        return (abs(amount), code, note, draftCategory ?? book.guessCategory(for: note, income: income))
+    }
+
+    /// Income when the switch says so, the line starts with "+", or its words are an income's
+    /// ("salary", "зарплата", "кэшбэк") and no spending category's.
+    var isIncomeDraft: Bool {
+        let text = draft.trimmingCharacters(in: .whitespaces)
+        if draftIncome || text.hasPrefix("+") { return true }
+        let words = text.replacingOccurrences(of: #"[\d.,$€₽₸£¥+-]"#, with: " ", options: .regularExpression)
+        guard words.contains(where: \.isLetter) else { return false }
+        return book.guessCategory(for: words, income: true) != "income-other" && book.guessCategory(for: words, income: false) == "other"
     }
 
     func addDraft() {
         guard let parsed = parsedDraft else { return }
-        let income = draftIncome || draft.hasPrefix("+")
-        book.transactions.append(MoneyTransaction(date: Date(), amount: parsed.amount, currency: currency, isIncome: income,
+        let income = isIncomeDraft
+        book.transactions.append(MoneyTransaction(date: Date(), amount: parsed.amount, currency: parsed.currency, isIncome: income,
                                                   categoryID: parsed.category, note: parsed.note))
         if draftCategory != nil, !parsed.note.isEmpty { book.learn(parsed.note, for: parsed.category) }
         draft = ""
@@ -84,6 +139,71 @@ final class FinanceStore: ObservableObject {
         save()
     }
 
+    // MARK: Categories
+
+    func addCategory(income: Bool) -> String {
+        let id = "custom-" + UUID().uuidString.prefix(8)
+        book.categories.append(MoneyCategory(id: String(id), name: income ? "New income" : "New category", emoji: income ? "💰" : "🏷️",
+                                             kind: income ? .income : .expense))
+        save()
+        return String(id)
+    }
+
+    func update(_ category: MoneyCategory) {
+        guard let index = book.categories.firstIndex(where: { $0.id == category.id }) else { return }
+        book.categories[index] = category
+        save()
+    }
+
+    /// Deletes a category; its transactions and plan items move to Other (or Other income).
+    func deleteCategory(_ id: String) {
+        guard let category = book.category(id), !["other", "income-other"].contains(id) else { return }
+        let fallback = category.kind == .income ? "income-other" : "other"
+        for index in book.transactions.indices where book.transactions[index].categoryID == id { book.transactions[index].categoryID = fallback }
+        for index in book.plan.indices where book.plan[index].categoryID == id { book.plan[index].categoryID = fallback }
+        book.categories.removeAll { $0.id == id }
+        save()
+    }
+
+    func usage(of id: String) -> Int { book.transactions.filter { $0.categoryID == id }.count }
+
+    // MARK: Plan
+
+    func addPlanItem(income: Bool) {
+        book.plan.append(PlanItem(title: income ? "Salary" : "Rent", amount: 0, isIncome: income,
+                                  categoryID: income ? "salary" : "home", day: nil))
+        save()
+    }
+
+    func update(_ item: PlanItem) {
+        guard let index = book.plan.firstIndex(where: { $0.id == item.id }) else { return }
+        book.plan[index] = item
+        save()
+    }
+
+    func deletePlanItem(_ item: PlanItem) {
+        book.plan.removeAll { $0.id == item.id }
+        save()
+    }
+
+    func setSavingsGoal(_ value: Double?) {
+        book.savingsGoal = value.flatMap { $0 > 0 ? $0 : nil }
+        save()
+    }
+
+    var plannedIncome: Double { book.plan.filter(\.isIncome).reduce(0) { $0 + $1.amount } }
+    /// Regular payments plus the category limits not already covered by them.
+    var plannedSpending: Double {
+        let regular = book.plan.filter { !$0.isIncome }.reduce(0) { $0 + $1.amount }
+        return max(regular, book.monthlyBudget ?? 0)
+    }
+
+    /// Has a planned item happened this month? (A transaction in its category close to its amount.)
+    func isDone(_ item: PlanItem) -> Bool {
+        monthTransactions.contains { $0.isIncome == item.isIncome && $0.categoryID == item.categoryID
+            && abs(inBase($0) - item.amount) <= max(item.amount * 0.15, 1) }
+    }
+
     func shiftMonth(_ step: Int) {
         month = Calendar.current.date(byAdding: .month, value: step, to: month) ?? month
     }
@@ -102,13 +222,13 @@ final class FinanceStore: ObservableObject {
         return book.transactions.filter { range.contains($0.date) }.sorted { $0.date > $1.date }
     }
 
-    var spent: Double { monthTransactions.filter { !$0.isIncome }.reduce(0) { $0 + $1.amount } }
-    var earned: Double { monthTransactions.filter(\.isIncome).reduce(0) { $0 + $1.amount } }
+    var spent: Double { monthTransactions.filter { !$0.isIncome }.reduce(0) { $0 + inBase($1) } }
+    var earned: Double { monthTransactions.filter(\.isIncome).reduce(0) { $0 + inBase($1) } }
 
     /// Spending per category this month, biggest first.
     var byCategory: [(category: MoneyCategory, total: Double)] {
         var totals: [String: Double] = [:]
-        for transaction in monthTransactions where !transaction.isIncome { totals[transaction.categoryID, default: 0] += transaction.amount }
+        for transaction in monthTransactions where !transaction.isIncome { totals[transaction.categoryID, default: 0] += inBase(transaction) }
         return totals.compactMap { id, total in book.category(id).map { ($0, total) } }.sorted { $0.total > $1.total }
     }
 
@@ -119,7 +239,7 @@ final class FinanceStore: ObservableObject {
         var totals = Array(repeating: 0.0, count: days)
         for transaction in monthTransactions where !transaction.isIncome {
             let day = calendar.component(.day, from: transaction.date) - 1
-            if totals.indices.contains(day) { totals[day] += transaction.amount }
+            if totals.indices.contains(day) { totals[day] += inBase(transaction) }
         }
         return totals
     }
