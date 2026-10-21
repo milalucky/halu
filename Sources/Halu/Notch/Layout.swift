@@ -10,7 +10,7 @@ enum Display: Equatable {
 enum Layout {
     static let windowSize = CGSize(width: 760, height: 540)
     static let expandedWidth: CGFloat = 680
-    static let contentHeight: CGFloat = 392
+    static let contentHeight: CGFloat = 404
     static let noticeWidth: CGFloat = 440
     /// The concave flare at the top corners; the body of the shape is inset by it.
     static let flare: CGFloat = 8

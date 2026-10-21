@@ -66,7 +66,7 @@ struct ExpandedView: View {
         VStack(spacing: 0) {
             HeaderBar(model: model, awake: services.awake, claude: services.claude, geometry: geometry)
             HStack(spacing: 0) {
-                Sidebar(model: model, claude: services.claude, media: services.media)
+                Sidebar(model: model, claude: services.claude, media: services.media, messages: services.messages)
                 Rectangle().fill(Theme.hairline).frame(width: 1).padding(.vertical, 6)
                 Group {
                     switch model.tab {
@@ -79,6 +79,7 @@ struct ExpandedView: View {
                     case .accounts: AccountsView(store: services.accounts)
                     case .notes: NotesView(store: services.notes)
                     case .media: MediaView(store: services.media)
+                    case .messages: MessagesView(store: services.messages)
                     case .jira: JiraView(store: services.jira) { model.tab = .settings }
                     case .settings: IntegrationsView(jira: services.jira)
                     }
@@ -155,6 +156,7 @@ struct Sidebar: View {
     @ObservedObject var model: AppModel
     @ObservedObject var claude: ClaudeStore
     @ObservedObject var media: MediaStore
+    @ObservedObject var messages: MessagesStore
     @Namespace private var selection
 
     /// Media only shows up while something plays or sits paused.
@@ -165,7 +167,8 @@ struct Sidebar: View {
     var body: some View {
         VStack(spacing: 1) {
             ForEach(tabs) { tab in
-                TabButton(tab: tab, selected: model.tab == tab, dot: tab == .claude && !claude.attention.isEmpty,
+                TabButton(tab: tab, selected: model.tab == tab,
+                          dot: (tab == .claude && !claude.attention.isEmpty) || (tab == .messages && messages.unseen > 0 && model.tab != .messages),
                           selection: selection) {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { model.tab = tab }
                 }

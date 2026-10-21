@@ -27,7 +27,7 @@ Native SwiftUI + AppKit app that lives in the MacBook notch and in a virtual not
 Next, after Media:
 
 10. Jira — done: Mine / Sprint / status queue (any assignee), projects auto-discovered (no hardcoded keys — the app must suit anyone), Start + any transition.
-11. Messages — new messages only, notification-style, from Slack and Telegram.
+11. Messages — done: Slack, Telegram, other messengers and mail apps, read from the macOS notification database (Full Disk Access). New = last 24 h; unread dot in the sidebar.
 12. Integrations screen in settings for API keys/tokens (Jira, Slack, …), stored in Keychain.
 13. Quick actions next to Keep Awake: VPN on/off first.
 
