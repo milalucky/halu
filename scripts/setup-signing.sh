@@ -25,9 +25,11 @@ keyUsage = critical,digitalSignature
 extendedKeyUsage = critical,codeSigning
 EOF
 
-openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -config "$WORK/cert.cnf" \
+# The system LibreSSL on purpose: OpenSSL 3 (e.g. from Homebrew) writes PKCS#12 files the Keychain can't read.
+OPENSSL=/usr/bin/openssl
+"$OPENSSL" req -x509 -newkey rsa:2048 -nodes -days 3650 -config "$WORK/cert.cnf" \
     -keyout "$WORK/key.pem" -out "$WORK/cert.pem" 2>/dev/null
-openssl pkcs12 -export -inkey "$WORK/key.pem" -in "$WORK/cert.pem" -name "$NAME" \
+"$OPENSSL" pkcs12 -export -inkey "$WORK/key.pem" -in "$WORK/cert.pem" -name "$NAME" \
     -out "$WORK/identity.p12" -passout pass:halu
 security import "$WORK/identity.p12" -k "$HOME/Library/Keychains/login.keychain-db" -P halu -T /usr/bin/codesign
 
