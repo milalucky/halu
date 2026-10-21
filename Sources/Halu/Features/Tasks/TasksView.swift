@@ -3,7 +3,6 @@ import SwiftUI
 struct TasksView: View {
     @ObservedObject var store: TaskStore
     @ObservedObject var speech: SpeechInput
-    @State private var draft = ""
     @State private var showingDone = false
     @State private var checking: Set<UUID> = []
 
@@ -20,10 +19,10 @@ struct TasksView: View {
         let open = store.open
         return VStack(alignment: .leading, spacing: 10) {
             SectionHeader(title: "To do", detail: open.isEmpty ? nil : "\(open.count) left")
-            InputField(placeholder: "Add a task or dictate it", text: $draft, speech: speech) {
+            InputField(placeholder: "Add a task or dictate it", text: $store.draft, speech: speech) {
                 speech.stop()
-                withAnimation(.spring(response: 0.3)) { store.add(draft) }
-                draft = ""
+                withAnimation(.spring(response: 0.3)) { store.add(store.draft) }
+                store.draft = ""
             }
             if let problem = speech.problem {
                 Text(problem).font(Theme.caption(11, weight: .regular)).foregroundStyle(Theme.orange)

@@ -19,9 +19,6 @@ struct IntegrationsView: View {
 
 private struct JiraCard: View {
     @ObservedObject var store: JiraStore
-    @State private var site = ""
-    @State private var email = ""
-    @State private var token = ""
     @State private var problem: String?
     @State private var connecting = false
 
@@ -46,9 +43,9 @@ private struct JiraCard: View {
                     PillButton(title: "Disconnect", tint: Theme.red, prominent: false, action: store.disconnect)
                 }
             } else {
-                Field(placeholder: "your-company.atlassian.net", text: $site)
-                Field(placeholder: "Work email", text: $email)
-                Field(placeholder: "API token", text: $token, secure: true)
+                Field(placeholder: "your-company.atlassian.net", text: $store.draftSite)
+                Field(placeholder: "Work email", text: $store.draftEmail)
+                Field(placeholder: "API token", text: $store.draftToken, secure: true)
                 HStack {
                     Link("Create an API token", destination: URL(string: "https://id.atlassian.com/manage-profile/security/api-tokens")!)
                         .font(Theme.caption(11.5, weight: .medium))
@@ -58,9 +55,9 @@ private struct JiraCard: View {
                     PillButton(title: "Connect") {
                         connecting = true
                         Task {
-                            problem = await store.connect(site: site, email: email, token: token)
+                            problem = await store.connect(site: store.draftSite, email: store.draftEmail, token: store.draftToken)
                             connecting = false
-                            if problem == nil { token = "" }
+                            if problem == nil { store.draftToken = "" }
                         }
                     }
                 }
@@ -71,10 +68,6 @@ private struct JiraCard: View {
         }
         .padding(14)
         .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.card))
-        .onAppear {
-            site = store.site
-            email = store.email
-        }
     }
 }
 

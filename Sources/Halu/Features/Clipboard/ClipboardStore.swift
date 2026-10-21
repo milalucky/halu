@@ -19,6 +19,8 @@ struct Snippet: Codable, Identifiable, Equatable {
 final class ClipboardStore: ObservableObject {
     @Published private(set) var history: [ClipEntry]
     @Published private(set) var snippets: [Snippet]
+    /// The snippet being written, kept here so it survives the panel closing.
+    @Published var snippetDraft: SnippetDraft?
 
     private let historyFile = JSONFile<[ClipEntry]>("clipboard.json")
     private let snippetsFile = JSONFile<[Snippet]>("snippets.json")

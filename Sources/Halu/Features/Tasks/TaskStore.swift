@@ -10,6 +10,8 @@ struct TaskItem: Codable, Identifiable, Equatable {
 @MainActor
 final class TaskStore: ObservableObject {
     @Published private(set) var items: [TaskItem]
+    /// The new-task field, kept here so it survives the panel closing.
+    @Published var draft = ""
     private let file = JSONFile<[TaskItem]>("tasks.json")
 
     init() {

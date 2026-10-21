@@ -12,6 +12,7 @@ struct JiraIssue: Identifiable, Equatable {
     var type: String
     var priority: String?
     var updated: Date
+    var assignee: String?
     var url: URL
 
     var id: String { key }
@@ -23,11 +24,23 @@ struct JiraTransition: Identifiable, Equatable {
     var category: JiraIssue.Category
 }
 
-/// Issues assigned to me in Jira Cloud (REST v3, email + API token).
+struct JiraProject: Identifiable, Equatable, Codable {
+    var key: String
+    var name: String
+    var id: String { key }
+}
+
+/// Jira Cloud (REST v3, email + API token). Nothing is project-specific: the projects come from the
+/// issues you've touched lately, and the status queue is any status you pick.
 @MainActor
 final class JiraStore: ObservableObject {
-    enum Filter: String, CaseIterable, Identifiable {
-        case all = "All", todo = "To Do", inProgress = "In Progress"
+    enum Mode: String, CaseIterable, Identifiable {
+        /// My open issues.
+        case mine = "Mine"
+        /// My issues in the open sprint, any status.
+        case sprint = "Sprint"
+        /// Everyone's issues in one chosen status, e.g. Ready to Test.
+        case queue = "Status"
         var id: String { rawValue }
     }
 
@@ -38,19 +51,43 @@ final class JiraStore: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var problem: String?
     @Published private(set) var busy: Set<String> = []
-    @Published var filter: Filter = .all
+    @Published private(set) var projects: [JiraProject] = (try? JSONDecoder().decode(
+        [JiraProject].self, from: UserDefaults.standard.data(forKey: "jira.projects") ?? Data())) ?? []
+    /// nil means every project.
+    @Published var project: String? = UserDefaults.standard.string(forKey: "jira.project") {
+        didSet { UserDefaults.standard.set(project, forKey: "jira.project"); statuses = []; refresh() }
+    }
+    @Published var mode: Mode = Mode(rawValue: UserDefaults.standard.string(forKey: "jira.mode") ?? "") ?? .mine {
+        didSet { UserDefaults.standard.set(mode.rawValue, forKey: "jira.mode"); refresh() }
+    }
+    /// Statuses to choose from for the queue, loaded for the current project.
+    @Published private(set) var statuses: [String] = []
+
+    // Connection form drafts: they live here so a half-filled form survives the panel closing.
+    @Published var draftSite = UserDefaults.standard.string(forKey: "jira.site") ?? ""
+    @Published var draftEmail = UserDefaults.standard.string(forKey: "jira.email") ?? ""
+    @Published var draftToken = ""
+
+    /// The status the queue shows, remembered per project.
+    var queueStatus: String? {
+        get { (UserDefaults.standard.dictionary(forKey: "jira.queueStatus") as? [String: String])?[project ?? "*"] }
+        set {
+            var all = UserDefaults.standard.dictionary(forKey: "jira.queueStatus") as? [String: String] ?? [:]
+            all[project ?? "*"] = newValue
+            UserDefaults.standard.set(all, forKey: "jira.queueStatus")
+            objectWillChange.send()
+            refresh()
+        }
+    }
 
     private static let tokenAccount = "jira-token"
     private var timer: Timer?
 
     var isConnected: Bool { !site.isEmpty && !email.isEmpty && accountName != nil }
 
-    var visibleIssues: [JiraIssue] {
-        switch filter {
-        case .all: issues
-        case .todo: issues.filter { $0.category == .todo }
-        case .inProgress: issues.filter { $0.category == .inProgress }
-        }
+    var projectName: String {
+        guard let project else { return "All projects" }
+        return projects.first { $0.key == project }?.name ?? project
     }
 
     func start() {
@@ -59,6 +96,7 @@ final class JiraStore: ObservableObject {
         }
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
+        discoverProjects()
         refresh()
     }
 
@@ -80,6 +118,7 @@ final class JiraStore: ObservableObject {
             UserDefaults.standard.set(host, forKey: "jira.site")
             UserDefaults.standard.set(email, forKey: "jira.email")
             UserDefaults.standard.set(accountName, forKey: "jira.accountName")
+            discoverProjects()
             refresh()
             return nil
         } catch {
@@ -91,6 +130,7 @@ final class JiraStore: ObservableObject {
         Keychain.delete(Self.tokenAccount)
         accountName = nil
         issues = []
+        projects = []
         UserDefaults.standard.removeObject(forKey: "jira.accountName")
     }
 
@@ -98,18 +138,90 @@ final class JiraStore: ObservableObject {
 
     func refresh() {
         guard isConnected, let client else { return }
+        if mode == .queue && statuses.isEmpty { loadStatuses() }
+        guard let jql else {
+            issues = []
+            return
+        }
         isLoading = true
+        let requested = (project, mode, queueStatus)
         Task {
             defer { isLoading = false }
             do {
-                let jql = "assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC"
-                let fields = "summary,status,issuetype,priority,updated"
-                let query = "jql=\(Self.encode(jql))&fields=\(fields)&maxResults=50"
-                let json = try await client.get("/rest/api/3/search/jql?\(query)")
-                issues = (json["issues"] as? [[String: Any]] ?? []).compactMap { parse($0) }
+                let found = try await search(client, jql: jql)
+                // Ignore answers for a view the user has already left.
+                guard requested == (project, mode, queueStatus) else { return }
+                issues = found
                 problem = nil
             } catch {
-                problem = Self.describe(error)
+                guard requested == (project, mode, queueStatus) else { return }
+                issues = []
+                problem = mode == .sprint ? "\(projectName) has no open sprint." : Self.describe(error)
+            }
+        }
+    }
+
+    private var jql: String? {
+        var parts: [String] = []
+        if let project { parts.append("project = \"\(project)\"") }
+        switch mode {
+        case .mine:
+            parts += ["assignee = currentUser()", "statusCategory != Done"]
+        case .sprint:
+            parts += ["assignee = currentUser()", "sprint in openSprints()"]
+        case .queue:
+            guard let status = queueStatus else { return nil }
+            parts.append("status = \"\(status)\"")
+        }
+        return parts.joined(separator: " AND ") + " ORDER BY updated DESC"
+    }
+
+    private func search(_ client: JiraClient, jql: String, fields: String = "summary,status,issuetype,priority,updated,assignee",
+                        limit: Int = 50) async throws -> [JiraIssue] {
+        let query = "jql=\(Self.encode(jql))&fields=\(fields)&maxResults=\(limit)"
+        let json = try await client.get("/rest/api/3/search/jql?\(query)")
+        return (json["issues"] as? [[String: Any]] ?? []).compactMap { parse($0) }
+    }
+
+    /// Projects of the issues I've been assigned or touched in the last 90 days.
+    func discoverProjects() {
+        guard isConnected, let client else { return }
+        Task {
+            let jql = "(assignee = currentUser() OR reporter = currentUser()) AND updated >= -90d ORDER BY updated DESC"
+            let query = "jql=\(Self.encode(jql))&fields=project&maxResults=100"
+            guard let json = try? await client.get("/rest/api/3/search/jql?\(query)") else { return }
+            var seen: [JiraProject] = []
+            for item in json["issues"] as? [[String: Any]] ?? [] {
+                guard let fields = item["fields"] as? [String: Any], let project = fields["project"] as? [String: Any],
+                      let key = project["key"] as? String, !seen.contains(where: { $0.key == key }) else { continue }
+                seen.append(JiraProject(key: key, name: project["name"] as? String ?? key))
+            }
+            projects = seen
+            UserDefaults.standard.set(try? JSONEncoder().encode(seen), forKey: "jira.projects")
+            if let current = project, !seen.contains(where: { $0.key == current }) { project = nil }
+        }
+    }
+
+    /// Status names for the queue picker; a status mentioning "test" is picked if none is chosen yet.
+    func loadStatuses() {
+        guard let client else { return }
+        let path = project.map { "/rest/api/3/project/\($0)/statuses" } ?? "/rest/api/3/status"
+        Task {
+            guard let url = URL(string: "https://\(site)\(path)"),
+                  let data = try? await client.raw(url) else { return }
+            var names: [String] = []
+            let json = try? JSONSerialization.jsonObject(with: data)
+            // Per project: [{issue type, statuses: [...]}]; global: [{name, ...}].
+            let entries = json as? [[String: Any]] ?? []
+            for entry in entries {
+                let list = (entry["statuses"] as? [[String: Any]]) ?? [entry]
+                for status in list {
+                    if let name = status["name"] as? String, !names.contains(name) { names.append(name) }
+                }
+            }
+            statuses = names.sorted()
+            if queueStatus == nil, let guess = names.first(where: { $0.localizedCaseInsensitiveContains("test") }) {
+                queueStatus = guess
             }
         }
     }
@@ -180,6 +292,7 @@ final class JiraStore: ObservableObject {
             type: (fields["issuetype"] as? [String: Any])?["name"] as? String ?? "",
             priority: (fields["priority"] as? [String: Any])?["name"] as? String,
             updated: (fields["updated"] as? String).flatMap(Self.dateFormatter.date(from:)) ?? .distantPast,
+            assignee: (fields["assignee"] as? [String: Any])?["displayName"] as? String,
             url: url
         )
     }
@@ -223,6 +336,16 @@ struct JiraClient: Sendable {
     let site: String
     let email: String
     let token: String
+
+    func raw(_ url: URL) async throws -> Data {
+        var request = URLRequest(url: url, timeoutInterval: 15)
+        request.setValue("Basic \(Data("\(email):\(token)".utf8).base64EncodedString())", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard (200..<300).contains(code) else { throw Failure.status(code, nil) }
+        return data
+    }
 
     func get(_ path: String) async throws -> [String: Any] {
         try await send(path, method: "GET", body: nil)

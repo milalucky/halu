@@ -3,7 +3,6 @@ import SwiftUI
 struct AccountsView: View {
     @ObservedObject var store: AccountStore
     @State private var query = ""
-    @State private var editing: Account?
     @State private var importNote: String?
 
     private var groups: [(service: String, accounts: [Account])] {
@@ -36,7 +35,7 @@ struct AccountsView: View {
                 }
                 IconButton(icon: "plus", help: "Add account", size: 12) {
                     withAnimation(.easeOut(duration: 0.2)) {
-                        editing = Account(service: query, login: "", password: "", notes: "")
+                        store.editing = Account(service: query, login: "", password: "", notes: "")
                     }
                 }
             }
@@ -44,17 +43,18 @@ struct AccountsView: View {
                 Text(importNote).font(Theme.caption(11, weight: .medium)).foregroundStyle(Theme.accent)
             }
 
-            if let account = editing {
-                AccountEditor(account: account, services: store.services) { saved in
+            if let account = store.editing {
+                AccountEditor(account: Binding(get: { store.editing ?? account }, set: { store.editing = $0 }),
+                              services: store.services) { saved in
                     store.save(saved)
-                    withAnimation(.easeOut(duration: 0.2)) { editing = nil }
+                    withAnimation(.easeOut(duration: 0.2)) { store.editing = nil }
                 } onCancel: {
-                    withAnimation(.easeOut(duration: 0.2)) { editing = nil }
+                    withAnimation(.easeOut(duration: 0.2)) { store.editing = nil }
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
-            if groups.isEmpty && editing == nil {
+            if groups.isEmpty && store.editing == nil {
                 EmptyState(icon: "key.horizontal", title: query.isEmpty ? "No accounts yet" : "No matches",
                            subtitle: query.isEmpty ? "Add test accounts one by one, or copy rows from your table and press Import." : "Try another word.")
             } else {
@@ -71,7 +71,7 @@ struct AccountsView: View {
                             }
                             ForEach(group.accounts) { account in
                                 AccountRow(account: account, store: store) {
-                                    withAnimation(.easeOut(duration: 0.2)) { editing = account }
+                                    withAnimation(.easeOut(duration: 0.2)) { store.editing = account }
                                 }
                             }
                         }
@@ -156,7 +156,7 @@ private struct CopyCell: View {
 }
 
 private struct AccountEditor: View {
-    @State var account: Account
+    @Binding var account: Account
     let services: [String]
     let onSave: (Account) -> Void
     let onCancel: () -> Void

@@ -3,7 +3,6 @@ import SwiftUI
 struct ClipboardView: View {
     @ObservedObject var store: ClipboardStore
     @State private var query = ""
-    @State private var editor: SnippetDraft?
 
     private var history: [ClipEntry] {
         store.history.filter { query.isEmpty || $0.text.localizedCaseInsensitiveContains(query) }
@@ -20,21 +19,21 @@ struct ClipboardView: View {
             HStack(spacing: 8) {
                 InputField(placeholder: "Search copied text and snippets", icon: "magnifyingglass", text: $query)
                 IconButton(icon: "plus", help: "New snippet", size: 12) {
-                    withAnimation(.easeOut(duration: 0.2)) { editor = SnippetDraft() }
+                    withAnimation(.easeOut(duration: 0.2)) { store.snippetDraft = SnippetDraft() }
                 }
             }
 
-            if let draft = editor {
-                SnippetEditor(draft: draft) { saved in
+            if let draft = store.snippetDraft {
+                SnippetEditor(draft: Binding(get: { store.snippetDraft ?? draft }, set: { store.snippetDraft = $0 })) { saved in
                     store.saveSnippet(id: saved.id, title: saved.title, text: saved.text)
-                    withAnimation(.easeOut(duration: 0.2)) { editor = nil }
+                    withAnimation(.easeOut(duration: 0.2)) { store.snippetDraft = nil }
                 } onCancel: {
-                    withAnimation(.easeOut(duration: 0.2)) { editor = nil }
+                    withAnimation(.easeOut(duration: 0.2)) { store.snippetDraft = nil }
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
-            if snippets.isEmpty && history.isEmpty && editor == nil {
+            if snippets.isEmpty && history.isEmpty && store.snippetDraft == nil {
                 EmptyState(icon: "doc.on.clipboard", title: query.isEmpty ? "Nothing copied yet" : "No matches",
                            subtitle: query.isEmpty ? "Text you copy shows up here. Star anything to keep it as a snippet." : "Try another word.")
             } else {
@@ -48,7 +47,7 @@ struct ClipboardView: View {
                                     store.copy(snippet.text)
                                 } actions: {
                                     IconButton(icon: "pencil", help: "Edit") {
-                                        withAnimation(.easeOut(duration: 0.2)) { editor = SnippetDraft(snippet) }
+                                        withAnimation(.easeOut(duration: 0.2)) { store.snippetDraft = SnippetDraft(snippet) }
                                     }
                                     IconButton(icon: "trash", help: "Delete snippet") {
                                         withAnimation { store.deleteSnippet(snippet) }
@@ -74,7 +73,7 @@ struct ClipboardView: View {
                                     store.copy(entry.text)
                                 } actions: {
                                     IconButton(icon: "star", help: "Keep as snippet") {
-                                        withAnimation(.easeOut(duration: 0.2)) { editor = SnippetDraft(text: entry.text) }
+                                        withAnimation(.easeOut(duration: 0.2)) { store.snippetDraft = SnippetDraft(text: entry.text) }
                                     }
                                     IconButton(icon: "trash", help: "Remove") {
                                         withAnimation { store.remove(entry) }
@@ -171,7 +170,7 @@ struct SnippetDraft: Equatable {
 }
 
 private struct SnippetEditor: View {
-    @State var draft: SnippetDraft
+    @Binding var draft: SnippetDraft
     let onSave: (SnippetDraft) -> Void
     let onCancel: () -> Void
 

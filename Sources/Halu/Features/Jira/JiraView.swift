@@ -12,12 +12,40 @@ struct JiraView: View {
         } else {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 8) {
-                    Picker("", selection: $store.filter) {
-                        ForEach(JiraStore.Filter.allCases) { Text($0.rawValue).tag($0) }
+                    // Only worth a switcher when there's more than one project to switch between.
+                    if store.projects.count > 1 || store.project != nil {
+                        Menu {
+                            Button("All projects") { store.project = nil }
+                            Divider()
+                            ForEach(store.projects) { project in
+                                Button("\(project.key) · \(project.name)") { store.project = project.key }
+                            }
+                        } label: {
+                            Text(store.project ?? "All").font(Theme.body(12.5, weight: .semibold))
+                        }
+                        .menuStyle(.borderlessButton)
+                        .fixedSize()
+                        .help(store.projectName)
+                    }
+                    Picker("", selection: $store.mode) {
+                        ForEach(JiraStore.Mode.allCases) { Text($0.rawValue).tag($0) }
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
-                    .frame(width: 250)
+                    .frame(width: 210)
+                    if store.mode == .queue {
+                        Menu {
+                            if store.statuses.isEmpty { Text("Loading…") }
+                            ForEach(store.statuses, id: \.self) { status in
+                                Button(status) { store.queueStatus = status }
+                            }
+                        } label: {
+                            Text(store.queueStatus ?? "Choose status").font(Theme.body(12.5, weight: .medium))
+                        }
+                        .menuStyle(.borderlessButton)
+                        .fixedSize()
+                        .onAppear { if store.statuses.isEmpty { store.loadStatuses() } }
+                    }
                     Spacer()
                     if store.isLoading { ProgressView().controlSize(.small) }
                     IconButton(icon: "arrow.clockwise", help: "Refresh", size: 11, action: store.refresh)
@@ -25,14 +53,16 @@ struct JiraView: View {
                 if let problem = store.problem {
                     Text(problem).font(Theme.caption(11.5, weight: .regular)).foregroundStyle(Theme.orange)
                 }
-                if store.visibleIssues.isEmpty && !store.isLoading {
+                if store.issues.isEmpty && !store.isLoading {
                     EmptyState(icon: "checkmark.seal", title: "Nothing here",
-                               subtitle: "No open issues assigned to you in this view.")
+                               subtitle: store.mode == .queue && store.queueStatus == nil
+                                   ? "Pick a status to see every issue in it, whoever it's assigned to."
+                                   : "No issues in this view.")
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 2) {
-                            ForEach(store.visibleIssues) { issue in
-                                IssueRow(issue: issue, store: store)
+                            ForEach(store.issues) { issue in
+                                IssueRow(issue: issue, store: store, showAssignee: store.mode == .queue)
                             }
                         }
                     }
@@ -46,6 +76,7 @@ struct JiraView: View {
 private struct IssueRow: View {
     let issue: JiraIssue
     @ObservedObject var store: JiraStore
+    var showAssignee = false
     @State private var transitions: [JiraTransition] = []
 
     private var statusTint: Color {
@@ -71,7 +102,8 @@ private struct IssueRow: View {
                         .lineLimit(1)
                     HStack(spacing: 6) {
                         Text(issue.key).font(.system(size: 10.5, weight: .semibold, design: .monospaced))
-                        if let priority = issue.priority { Text("· \(priority)") }
+                        if showAssignee { Text("· \(issue.assignee ?? "Unassigned")") }
+                        if let priority = issue.priority, !showAssignee { Text("· \(priority)") }
                         Text("· \(Fmt.ago(issue.updated))")
                     }
                     .font(Theme.caption(10.5, weight: .regular))

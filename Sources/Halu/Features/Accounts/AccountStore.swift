@@ -17,6 +17,8 @@ struct Account: Codable, Identifiable, Equatable {
 final class AccountStore: ObservableObject {
     @Published private(set) var accounts: [Account] = []
     @Published private(set) var problem: String?
+    /// The account being added or edited, kept here so a half-filled form survives the panel closing.
+    @Published var editing: Account?
 
     private let url = HaluStorage.directory.appendingPathComponent("accounts.vault")
     private var key: SymmetricKey?
