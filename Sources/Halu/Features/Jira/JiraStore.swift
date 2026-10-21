@@ -62,6 +62,8 @@ final class JiraStore: ObservableObject {
     }
     /// Statuses to choose from for the queue, loaded for the current project.
     @Published private(set) var statuses: [String] = []
+    /// Statuses the user chose not to see (say, Release Ready), in every view.
+    @Published private(set) var hiddenStatuses: [String] = UserDefaults.standard.stringArray(forKey: "jira.hiddenStatuses") ?? []
 
     // Connection form drafts: they live here so a half-filled form survives the panel closing.
     @Published var draftSite = UserDefaults.standard.string(forKey: "jira.site") ?? ""
@@ -148,7 +150,7 @@ final class JiraStore: ObservableObject {
         Task {
             defer { isLoading = false }
             do {
-                let found = try await search(client, jql: jql)
+                let found = try await search(client, jql: jql, limit: pageLimit)
                 // Ignore answers for a view the user has already left.
                 guard requested == (project, mode, queueStatus) else { return }
                 issues = found
@@ -162,11 +164,20 @@ final class JiraStore: ObservableObject {
     }
 
     private var jql: String? {
+        // "All projects" means the projects you work in, never the whole company Jira.
         var parts: [String] = []
-        if let project { parts.append("project = \"\(project)\"") }
+        if let project {
+            parts.append("project = \"\(project)\"")
+        } else if !projects.isEmpty {
+            parts.append("project in (\(projects.map { "\"\($0.key)\"" }.joined(separator: ", ")))")
+        }
+        parts.append("statusCategory != Done")
+        if !hiddenStatuses.isEmpty {
+            parts.append("status not in (\(hiddenStatuses.map { "\"\($0)\"" }.joined(separator: ", ")))")
+        }
         switch mode {
         case .mine:
-            parts += ["assignee = currentUser()", "statusCategory != Done"]
+            parts.append("assignee = currentUser()")
         case .sprint:
             parts += ["assignee = currentUser()", "sprint in openSprints()"]
         case .queue:
@@ -176,6 +187,23 @@ final class JiraStore: ObservableObject {
         return parts.joined(separator: " AND ") + " ORDER BY updated DESC"
     }
 
+    /// Search limit; at the limit the count reads "100+".
+    let pageLimit = 100
+
+    func hideStatus(_ status: String) {
+        guard !hiddenStatuses.contains(status) else { return }
+        hiddenStatuses.append(status)
+        UserDefaults.standard.set(hiddenStatuses, forKey: "jira.hiddenStatuses")
+        issues.removeAll { $0.status == status }
+        refresh()
+    }
+
+    func showStatus(_ status: String) {
+        hiddenStatuses.removeAll { $0 == status }
+        UserDefaults.standard.set(hiddenStatuses, forKey: "jira.hiddenStatuses")
+        refresh()
+    }
+
     private func search(_ client: JiraClient, jql: String, fields: String = "summary,status,issuetype,priority,updated,assignee",
                         limit: Int = 50) async throws -> [JiraIssue] {
         let query = "jql=\(Self.encode(jql))&fields=\(fields)&maxResults=\(limit)"
@@ -183,11 +211,11 @@ final class JiraStore: ObservableObject {
         return (json["issues"] as? [[String: Any]] ?? []).compactMap { parse($0) }
     }
 
-    /// Projects of the issues I've been assigned or touched in the last 90 days.
+    /// Projects of the issues assigned to me in the last 90 days.
     func discoverProjects() {
         guard isConnected, let client else { return }
         Task {
-            let jql = "(assignee = currentUser() OR reporter = currentUser()) AND updated >= -90d ORDER BY updated DESC"
+            let jql = "assignee = currentUser() AND updated >= -90d ORDER BY updated DESC"
             let query = "jql=\(Self.encode(jql))&fields=project&maxResults=100"
             guard let json = try? await client.get("/rest/api/3/search/jql?\(query)") else { return }
             var seen: [JiraProject] = []
@@ -196,9 +224,14 @@ final class JiraStore: ObservableObject {
                       let key = project["key"] as? String, !seen.contains(where: { $0.key == key }) else { continue }
                 seen.append(JiraProject(key: key, name: project["name"] as? String ?? key))
             }
+            let changed = seen != projects
             projects = seen
             UserDefaults.standard.set(try? JSONEncoder().encode(seen), forKey: "jira.projects")
-            if let current = project, !seen.contains(where: { $0.key == current }) { project = nil }
+            if let current = project, !seen.contains(where: { $0.key == current }) {
+                project = nil
+            } else if changed {
+                refresh()
+            }
         }
     }
 

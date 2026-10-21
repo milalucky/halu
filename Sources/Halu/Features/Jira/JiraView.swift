@@ -68,8 +68,31 @@ struct JiraView: View {
                     }
                     .scrollIndicators(.never)
                 }
+                HStack(spacing: 8) {
+                    Text(countText).monospacedDigit()
+                    if !store.hiddenStatuses.isEmpty {
+                        Menu {
+                            ForEach(store.hiddenStatuses, id: \.self) { status in
+                                Button("Show “\(status)”") { store.showStatus(status) }
+                            }
+                        } label: {
+                            Text("\(store.hiddenStatuses.count) hidden status\(store.hiddenStatuses.count == 1 ? "" : "es")")
+                        }
+                        .menuStyle(.borderlessButton)
+                        .fixedSize()
+                    }
+                    Spacer()
+                }
+                .font(Theme.caption(11.5, weight: .medium))
+                .foregroundStyle(Theme.tertiary)
             }
         }
+    }
+
+    private var countText: String {
+        let count = store.issues.count
+        let number = count >= store.pageLimit ? "\(count)+" : "\(count)"
+        return count == 1 ? "1 issue" : "\(number) issues"
     }
 }
 
@@ -123,6 +146,7 @@ private struct IssueRow: View {
                             Button(transition.name) { store.perform(transition, on: issue) }
                         }
                         Divider()
+                        Button("Hide “\(issue.status)” issues") { withAnimation { store.hideStatus(issue.status) } }
                         Button("Copy \(issue.key)") { store.copyKey(issue) }
                         Button("Open in Browser") { store.open(issue) }
                     } label: {
