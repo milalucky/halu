@@ -28,6 +28,8 @@ struct IntegrationsView: View {
                         TabRow(tab: tab, model: model, isFirst: index == 0, isLast: index == model.order.count - 1)
                     }
                 }
+                SectionHeader(title: "Tools", detail: "Show only the parts of the Tools tab you use")
+                ToolsSections(tools: Services.shared.tools)
                 SectionHeader(title: "Integrations", detail: "Jira's token stays in your Keychain; the rest is read from open tabs")
                     .padding(.top, 8)
                 JiraCard(store: jira)
@@ -58,6 +60,30 @@ struct IntegrationsView: View {
                 ForEach(AppModel.HoverDelay.allCases) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented).labelsHidden().fixedSize()
+        }
+    }
+}
+
+/// Switches for each Tools mode and screen utility.
+private struct ToolsSections: View {
+    @ObservedObject var tools: ToolsStore
+
+    var body: some View {
+        let items: [(String, String)] = ToolsStore.Mode.allCases.map { ($0.rawValue, $0.icon) } + ToolsStore.Utility.allCases.map { ($0.rawValue, $0.icon) }
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)], spacing: 6) {
+            ForEach(items, id: \.0) { name, icon in
+                HStack(spacing: 8) {
+                    Image(systemName: icon).font(.system(size: 11, weight: .semibold)).frame(width: 16)
+                        .foregroundStyle(tools.isShown(name) ? Theme.primary : Theme.tertiary)
+                    Text(name).font(Theme.body(12, weight: .medium)).foregroundStyle(tools.isShown(name) ? Theme.primary : Theme.tertiary).lineLimit(1)
+                    Spacer(minLength: 2)
+                    Toggle("", isOn: Binding(get: { tools.isShown(name) }, set: { tools.setShown(name, $0) }))
+                        .toggleStyle(.switch).controlSize(.mini).labelsHidden().tint(Theme.accent)
+                }
+                .padding(.horizontal, 10)
+                .frame(height: 32)
+                .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.card))
+            }
         }
     }
 }

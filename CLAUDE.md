@@ -59,6 +59,8 @@ Settings → Appearance also has Colours (Style: Minimal / Playful / Neon — pe
 
 18. Money (Tab.finance) — must-have, and the one feature that will go to iPhone and Apple Watch. Models (MoneyBook, MoneyTransaction, MoneyCategory with keywords and budgets) and StatementParser live in HaluCore so the phone and watch apps can share them; storage is money.json for now (CloudKit later). Quick entry "350 coffee" guesses the category from keywords; changing a category teaches the shop (MoneyBook.learn/merchantKey). Import: CSV (UTF-8 / Windows-1251, ; , or tab) and .xlsx (first sheet via /usr/bin/unzip + XMLParser); header row found by Russian/English column names; failed rows skipped; fingerprints stop duplicates. Overview (spent/income/left, donut, by-day bars), Transactions (search, recategorize), Budget (monthly + per-category limits).
 
+Themes (Style): Minimal, Playful (default), Neon, Glass — each changes the panel backdrop (PanelBackground), card tint (Theme.card follows the theme), sidebar icon colours, and Neon adds a travelling gradient rim (NeonRim). Light Glass was dropped. Tools sections (modes and utilities) can be hidden in Settings (ToolsStore.hidden). Converter is its own Tools mode (ConverterKind: money via open.er-api rates, units via Measurement); the Calculator line is for sums. Money: Spending/Income switch, currency words in the entry line ($100, 20 евро) counted in roubles via market rates, income words flip to income, category chips; Plan (expected income, regular payments, savings goal, limits) and Categories (edit/hide/delete/add).
+
 Tabs are configurable in Settings (gear): all on by default; a disabled tab hides from the sidebar, pauses its store's background work (`isActive`), and drops its notch indicators.
 
 ## Roadmap

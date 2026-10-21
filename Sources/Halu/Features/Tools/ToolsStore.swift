@@ -4,7 +4,7 @@ import AppKit
 @MainActor
 final class ToolsStore: ObservableObject {
     enum Mode: String, CaseIterable, Identifiable {
-        case generate = "Test data", convert = "Decode", compare = "Compare", calculator = "Calculator", emoji = "Emoji", stocks = "Stocks"
+        case generate = "Test data", convert = "Decode", compare = "Compare", calculator = "Calculator", converter = "Converter", emoji = "Emoji", stocks = "Stocks"
         var id: String { rawValue }
 
         var icon: String {
@@ -13,6 +13,7 @@ final class ToolsStore: ObservableObject {
             case .convert: "chevron.left.forwardslash.chevron.right"
             case .compare: "arrow.left.arrow.right.square"
             case .calculator: "plus.forwardslash.minus"
+            case .converter: "arrow.triangle.2.circlepath"
             case .emoji: "face.smiling"
             case .stocks: "chart.line.uptrend.xyaxis"
             }
@@ -31,6 +32,29 @@ final class ToolsStore: ObservableObject {
     }
     @Published private(set) var values: [String: String] = [:]
     @Published var input = ""
+    /// Screen utilities next to the modes.
+    enum Utility: String, CaseIterable, Identifiable {
+        case color = "Colour picker", mirror = "Mirror", ruler = "Ruler"
+        var id: String { rawValue }
+        var icon: String { self == .color ? "eyedropper" : self == .mirror ? "web.camera" : "ruler" }
+    }
+
+    /// Sections turned off in Settings.
+    @Published private(set) var hidden: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "tools.hidden") ?? [])
+
+    var modes: [Mode] { Mode.allCases.filter { !hidden.contains($0.rawValue) } }
+    func shows(_ utility: Utility) -> Bool { !hidden.contains(utility.rawValue) }
+
+    func isShown(_ name: String) -> Bool { !hidden.contains(name) }
+
+    func setShown(_ name: String, _ shown: Bool) {
+        if shown { hidden.remove(name) } else { hidden.insert(name) }
+        // Keep at least one mode.
+        if modes.isEmpty { hidden.remove(Mode.generate.rawValue) }
+        if !modes.contains(mode), let first = modes.first { mode = first }
+        UserDefaults.standard.set(Array(hidden), forKey: "tools.hidden")
+    }
+
     /// The camera mirror is open over the Tools tab.
     @Published var showingMirror = false
     @Published private(set) var copied: String?

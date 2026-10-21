@@ -12,7 +12,7 @@ struct ToolsView: View {
             HStack(spacing: 8) {
                 // Icons for every mode, the name only on the chosen one.
                 HStack(spacing: 2) {
-                    ForEach(ToolsStore.Mode.allCases) { mode in
+                    ForEach(store.modes) { mode in
                         ModeButton(mode: mode, selected: store.mode == mode, namespace: modes) {
                             withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) { store.mode = mode }
                         }
@@ -22,13 +22,19 @@ struct ToolsView: View {
                 .background(Capsule().fill(Theme.card))
                 Spacer()
                 // Screen utilities: one click each.
-                ToolButton(icon: "eyedropper", title: screen.hex ?? "Color", swatch: screen.color.map(Color.init(nsColor:)),
-                           help: "Pick a colour anywhere on screen; its hex is copied", action: screen.pickColor)
-                ToolButton(icon: "web.camera", title: "Mirror", help: "See yourself before a call") {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { store.showingMirror = true }
+                if store.shows(.color) {
+                    ToolButton(icon: "eyedropper", title: screen.hex ?? "Color", swatch: screen.color.map(Color.init(nsColor:)),
+                               help: "Pick a colour anywhere on screen; its hex is copied", action: screen.pickColor)
                 }
-                ToolButton(icon: "ruler", title: "Ruler", help: screen.lastMeasure.map { "Last: \($0)" } ?? "Measure anything on screen in pixels",
-                           action: screen.showRuler)
+                if store.shows(.mirror) {
+                    ToolButton(icon: "web.camera", title: "Mirror", help: "See yourself before a call") {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { store.showingMirror = true }
+                    }
+                }
+                if store.shows(.ruler) {
+                    ToolButton(icon: "ruler", title: "Ruler", help: screen.lastMeasure.map { "Last: \($0)" } ?? "Measure gaps between elements on screen",
+                               action: screen.showRuler)
+                }
             }
             if store.showingMirror {
                 MirrorView { withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { store.showingMirror = false } }
@@ -38,6 +44,7 @@ struct ToolsView: View {
             case .convert: ConvertView(store: store)
             case .compare: CompareView(store: compare)
             case .calculator: CalculatorView(market: market)
+            case .converter: ConverterView(market: market)
             case .emoji: EmojiView(market: market)
             case .stocks: StocksView(market: market)
             }
