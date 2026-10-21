@@ -37,6 +37,8 @@ On the roadmap: media controls, Jira and Slack integrations, and an iPhone compa
 
 This builds `Halu.app`, copies it to `~/Applications` and launches it. Halu runs from the menu bar; it has no Dock icon.
 
+Optional, once: `./scripts/setup-signing.sh` creates a local signing certificate so macOS keeps Halu's permissions (microphone, calendars, Notes) across rebuilds.
+
 ## Permissions
 
 Halu asks only when a feature needs it:

@@ -13,8 +13,14 @@ cp "$BIN/Halu" "$APP/Contents/MacOS/Halu"
 cp "$BIN/halu-hook" "$APP/Contents/MacOS/halu-hook"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
-codesign --force --sign - "$APP/Contents/MacOS/halu-hook"
-codesign --force --sign - "$APP"
+# A stable identity (see setup-signing.sh) keeps macOS permissions across rebuilds; ad-hoc otherwise.
+IDENTITY="-"
+if security find-identity -p codesigning | grep -q "Halu Local Signing"; then
+    IDENTITY="Halu Local Signing"
+fi
+codesign --force --sign "$IDENTITY" "$APP/Contents/MacOS/halu-hook"
+codesign --force --sign "$IDENTITY" "$APP"
+echo "Signed with: $IDENTITY"
 echo "Built $APP"
 
 if [[ "${1:-}" == "--install" ]]; then

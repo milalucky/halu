@@ -6,6 +6,8 @@ import Speech
 final class SpeechInput: ObservableObject {
     @Published private(set) var isRecording = false
     @Published private(set) var problem: String?
+    /// Microphone loudness while recording, 0…1, so it's obvious whether sound arrives at all.
+    @Published private(set) var level: Float = 0
     @Published var language: String {
         didSet { UserDefaults.standard.set(language, forKey: "speech.language") }
     }
@@ -90,7 +92,9 @@ final class SpeechInput: ObservableObject {
         self.request = request
 
         let input = engine.inputNode
-        Self.installTap(on: input, feeding: request)
+        Self.installTap(on: input, feeding: request) { [weak self] level in
+            self?.level = level
+        }
         engine.prepare()
         do {
             try engine.start()
@@ -117,6 +121,7 @@ final class SpeechInput: ObservableObject {
     }
 
     private func teardownAudio() {
+        level = 0
         if engine.isRunning { engine.stop() }
         engine.inputNode.removeTap(onBus: 0)
     }
@@ -124,11 +129,19 @@ final class SpeechInput: ObservableObject {
     // Audio and recognition callbacks arrive on background threads, so they are set up
     // outside the main actor and hop back explicitly.
 
-    private nonisolated static func installTap(on input: AVAudioInputNode, feeding request: SFSpeechAudioBufferRecognitionRequest) {
+    private nonisolated static func installTap(on input: AVAudioInputNode, feeding request: SFSpeechAudioBufferRecognitionRequest,
+                                               level: @escaping @MainActor (Float) -> Void) {
         let format = input.outputFormat(forBus: 0)
         input.removeTap(onBus: 0)
         input.installTap(onBus: 0, bufferSize: 1024, format: format) { @Sendable buffer, _ in
             request.append(buffer)
+            guard let samples = buffer.floatChannelData?[0], buffer.frameLength > 0 else { return }
+            var sum: Float = 0
+            for index in 0..<Int(buffer.frameLength) { sum += samples[index] * samples[index] }
+            let rms = (sum / Float(buffer.frameLength)).squareRoot()
+            // Roughly -50 dB … 0 dB mapped onto 0…1.
+            let value = max(0, min(1, (20 * log10(max(rms, 1e-6)) + 50) / 50))
+            DispatchQueue.main.async { MainActor.assumeIsolated { level(value) } }
         }
     }
 

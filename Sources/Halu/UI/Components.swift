@@ -168,7 +168,30 @@ struct VoiceButton: View {
             .buttonStyle(.plain)
             .onHover { hovering = $0 }
             .help(speech.problem ?? (recording ? "Stop dictation" : "Dictate"))
+
+            if recording {
+                LevelBars(level: speech.level).transition(.opacity)
+            }
         }
+    }
+}
+
+/// Five bars that follow the microphone level.
+struct LevelBars: View {
+    let level: Float
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(0..<5, id: \.self) { index in
+                let threshold = Float(index) / 5
+                Capsule()
+                    .fill(level > threshold ? Theme.red : Theme.tertiary.opacity(0.4))
+                    .frame(width: 2.5, height: 5 + CGFloat(index) * 2.5)
+            }
+        }
+        .frame(height: 16)
+        .animation(.easeOut(duration: 0.08), value: level)
+        .help(level < 0.05 ? "No sound from the microphone" : "Listening")
     }
 }
 

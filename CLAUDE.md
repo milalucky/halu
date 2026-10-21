@@ -24,7 +24,12 @@ Native SwiftUI + AppKit app that lives in the MacBook notch and in a virtual not
 8. Notes.
 9. Media — now playing, music and any video, last.
 
-Later: Integrations screen with API keys — Jira (company Atlassian, API token), Slack notifications.
+Next, after Media:
+
+10. Jira — issues assigned to me (company Atlassian Cloud, API token), quick actions like "Start progress".
+11. Messages — new messages only, notification-style, from Slack and Telegram.
+12. Integrations screen in settings for API keys/tokens (Jira, Slack, …), stored in Keychain.
+13. Quick actions next to Keep Awake: VPN on/off first.
 
 ## Roadmap
 
