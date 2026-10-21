@@ -1,5 +1,6 @@
 import AppKit
 import UniformTypeIdentifiers
+import Vision
 
 struct ShelfItem: Codable, Identifiable, Equatable {
     enum Kind: String, Codable { case image, video, file }
@@ -26,7 +27,55 @@ final class ShelfStore: ObservableObject {
     /// False while the tab is turned off in Settings: background work pauses.
     var isActive: () -> Bool = { true }
 
-    @Published private(set) var items: [ShelfItem] = []
+    @Published private(set) var items: [ShelfItem] = [] {
+        didSet { indexText() }
+    }
+    /// Text read off each image (Vision, on the Mac), by file path, so screenshots can be searched.
+    @Published private(set) var texts: [String: String] = JSONFile<[String: String]>("shelf-text.json").load() ?? [:]
+    @Published var query = ""
+    private let textFile = JSONFile<[String: String]>("shelf-text.json")
+    private var reading: Set<String> = []
+
+    /// Items whose name or text matches the search.
+    var visible: [ShelfItem] {
+        let query = query.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty else { return items }
+        return items.filter { item in
+            item.url.lastPathComponent.localizedCaseInsensitiveContains(query)
+                || (texts[item.url.path]?.localizedCaseInsensitiveContains(query) ?? false)
+        }
+    }
+
+    /// Reads the text on images that haven't been read yet, in the background.
+    private func indexText() {
+        for item in items where item.kind == .image && texts[item.url.path] == nil && !reading.contains(item.url.path) {
+            let path = item.url.path
+            reading.insert(path)
+            DispatchQueue.global(qos: .utility).async {
+                let text = Self.recognize(URL(fileURLWithPath: path))
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated {
+                        self.reading.remove(path)
+                        self.texts[path] = text
+                        // Forget text of files no longer on the shelf.
+                        let paths = Set(self.items.map(\.url.path))
+                        self.texts = self.texts.filter { paths.contains($0.key) }
+                        self.textFile.save(self.texts)
+                    }
+                }
+            }
+        }
+    }
+
+    private nonisolated static func recognize(_ url: URL) -> String {
+        guard let image = NSImage(contentsOf: url)?.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return "" }
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.recognitionLanguages = ["ru-RU", "en-US"]
+        request.usesLanguageCorrection = true
+        try? VNImageRequestHandler(cgImage: image).perform([request])
+        return (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
+    }
 
     let screenshotFolder: URL
     private let file = JSONFile<[ShelfItem]>("shelf.json")

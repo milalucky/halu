@@ -31,6 +31,12 @@ struct RootView: View {
         ZStack(alignment: .top) {
             PanelBackground(shape: shape, glass: lifted ? model.appearance : .black, headerHeight: Layout.headerHeight(state.geometry))
                 .shadow(color: .black.opacity(lifted ? 0.55 : 0), radius: 22, y: 10)
+            if display == .expanded && model.style.glows {
+                // Neon: the panel's rim glows in the tab's colour.
+                shape.stroke(Theme.accent.opacity(0.55), lineWidth: 1.2)
+                    .shadow(color: Theme.accent.opacity(0.6), radius: 8)
+                    .allowsHitTesting(false)
+            }
             content(display)
                 .frame(width: size.width, height: size.height, alignment: .top)
                 .clipShape(shape)
@@ -99,7 +105,7 @@ struct TabContent: View {
         case .weather: WeatherView(weather: services.weather)
         case .clipboard: ClipboardTab(clipboard: services.clipboard, shelf: services.shelf)
         case .translate: TranslateView(store: services.translate, speech: services.speech)
-        case .tools: ToolsView(store: services.tools, compare: services.compare, screen: services.screenTools)
+        case .tools: ToolsView(store: services.tools, compare: services.compare, screen: services.screenTools, market: services.market)
         case .accounts: AccountsView(store: services.accounts)
         case .notes: NotesView(store: services.notes)
         case .media: MediaView(store: services.media)
@@ -162,6 +168,7 @@ struct ExpandedView: View {
                 Sidebar(model: model, claude: services.claude, media: services.media, messages: services.messages, gitlab: services.gitlab)
                 Rectangle().fill(Theme.hairline).frame(width: 1).padding(.vertical, 6)
                 TabContent(model: model, services: services)
+                .id(model.style)
                 .padding(.leading, 18)
                 .padding(.trailing, 20)
                 .padding(.top, 4)
@@ -227,7 +234,7 @@ struct HeaderBar: View {
                 .help("Open Halu in a window")
                 Text(model.tab.title)
                     .font(Theme.title(14))
-                    .foregroundStyle(Theme.tertiary)
+                    .foregroundStyle(model.style == .minimal ? Theme.tertiary : Style.current.color(for: model.tab).opacity(0.85))
                     .contentTransition(.opacity)
                     .animation(.easeOut(duration: 0.15), value: model.tab)
                     .lineLimit(1)
@@ -321,8 +328,10 @@ struct TabButton: View {
         Button(action: action) {
             ZStack {
                 if selected {
+                    let tint = Style.current.color(for: tab)
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color.white.opacity(0.12))
+                        .fill(Style.current == .minimal ? Color.white.opacity(0.12) : tint.opacity(Style.current.glows ? 0.24 : 0.18))
+                        .shadow(color: Style.current.glows ? tint.opacity(0.7) : .clear, radius: 8)
                         .matchedGeometryEffect(id: "tab", in: selection)
                 } else if hovering {
                     RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.card)
@@ -337,7 +346,9 @@ struct TabButton: View {
                             .font(.system(size: 14, weight: selected ? .semibold : .regular))
                     }
                 }
-                .foregroundStyle(selected ? Theme.primary : (hovering ? Theme.secondary : Theme.tertiary))
+                .foregroundStyle(selected ? (Style.current == .minimal ? Theme.primary : Style.current.color(for: tab))
+                                          : (hovering ? Theme.secondary : Theme.tertiary))
+                .shadow(color: selected && Style.current.glows ? Style.current.color(for: tab) : .clear, radius: 4)
             }
             .frame(width: 38, height: height)
             .overlay(alignment: .topTrailing) {

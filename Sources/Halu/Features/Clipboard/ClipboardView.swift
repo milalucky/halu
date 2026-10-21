@@ -76,7 +76,18 @@ struct ClipboardView: View {
                                 }
                             }
                         }
-                        if !history.isEmpty {
+                        let pinned = history.filter(\.pinned)
+                        if !pinned.isEmpty {
+                            SmallCaps("Pinned")
+                            ForEach(pinned) { entry in
+                                ClipRow(text: entry.text, title: nil, detail: entry.app, starred: false) {
+                                    store.copy(entry.text)
+                                } actions: {
+                                    IconButton(icon: "pin.slash", help: "Unpin") { withAnimation(.spring(response: 0.3)) { store.togglePin(entry) } }
+                                }
+                            }
+                        }
+                        if history.contains(where: { !$0.pinned }) {
                             HStack {
                                 SmallCaps("Recent")
                                 Spacer()
@@ -87,12 +98,13 @@ struct ClipboardView: View {
                                     .padding(.top, 8)
                                     .padding(.trailing, 8)
                             }
-                            ForEach(history) { entry in
+                            ForEach(history.filter { !$0.pinned }) { entry in
                                 ClipRow(text: entry.text, title: nil,
                                         detail: [entry.app, Fmt.ago(entry.copiedAt)].compactMap { $0 }.joined(separator: " · "),
                                         starred: false) {
                                     store.copy(entry.text)
                                 } actions: {
+                                    IconButton(icon: "pin", help: "Pin to the top") { withAnimation(.spring(response: 0.3)) { store.togglePin(entry) } }
                                     IconButton(icon: "star", help: "Keep as snippet") {
                                         withAnimation(.easeOut(duration: 0.2)) { store.snippetDraft = SnippetDraft(text: entry.text) }
                                     }

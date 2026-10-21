@@ -1,7 +1,8 @@
 import SwiftUI
 
 enum Theme {
-    static let accent = Color(red: 0.70, green: 0.64, blue: 1.00)
+    /// The current tab's colour in the chosen style (lavender before anything is chosen).
+    static var accent = Color(red: 0.70, green: 0.64, blue: 1.00)
     static let green = Color(red: 0.45, green: 0.86, blue: 0.62)
     static let orange = Color(red: 1.00, green: 0.66, blue: 0.36)
     static let red = Color(red: 1.00, green: 0.45, blue: 0.45)

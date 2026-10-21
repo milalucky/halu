@@ -8,9 +8,11 @@ enum Display: Equatable {
 }
 
 enum Layout {
-    static let windowSize = CGSize(width: 760, height: 540)
-    static let expandedWidth: CGFloat = 680
-    static let contentHeight: CGFloat = 404
+    /// The transparent window the panel is drawn in: room for the widest panel and its shadow.
+    static let windowSize = CGSize(width: 1000, height: 640)
+    /// The open panel's size, from Settings → Panel size (AppModel keeps these in step).
+    static var expandedWidth: CGFloat = 680
+    static var contentHeight: CGFloat = 404
     static let noticeWidth: CGFloat = 440
     /// The concave flare at the top corners; the body of the shape is inset by it.
     static let flare: CGFloat = 8

@@ -50,7 +50,19 @@ enum Tab: String, CaseIterable, Identifiable {
 @MainActor
 final class AppModel: ObservableObject {
     @Published var tab: Tab {
-        didSet { UserDefaults.standard.set(tab.rawValue, forKey: "selectedTab") }
+        didSet {
+            UserDefaults.standard.set(tab.rawValue, forKey: "selectedTab")
+            Theme.accent = style.color(for: tab)
+        }
+    }
+
+    /// Minimal, Playful or Neon.
+    @Published var style = Style.current {
+        didSet {
+            UserDefaults.standard.set(style.rawValue, forKey: "style")
+            Style.current = style
+            Theme.accent = style.color(for: tab)
+        }
     }
 
     enum Appearance: String, CaseIterable, Identifiable {
@@ -61,6 +73,37 @@ final class AppModel: ObservableObject {
     /// How the open panel looks: black like the notch, or Liquid Glass, dark or light.
     @Published var appearance = Appearance(rawValue: UserDefaults.standard.string(forKey: "appearance") ?? "") ?? .black {
         didSet { UserDefaults.standard.set(appearance.rawValue, forKey: "appearance") }
+    }
+
+    enum PanelSize: String, CaseIterable, Identifiable {
+        case compact = "Compact", comfortable = "Comfortable", wide = "Wide"
+        var id: String { rawValue }
+        var size: CGSize {
+            switch self {
+            case .compact: CGSize(width: 680, height: 404)
+            case .comfortable: CGSize(width: 780, height: 440)
+            case .wide: CGSize(width: 880, height: 480)
+            }
+        }
+    }
+
+    enum HoverDelay: String, CaseIterable, Identifiable {
+        case quick = "Quick", normal = "Normal", relaxed = "Relaxed"
+        var id: String { rawValue }
+        var seconds: TimeInterval { self == .quick ? 0.04 : self == .normal ? 0.12 : 0.4 }
+    }
+
+    @Published var panelSize = PanelSize(rawValue: UserDefaults.standard.string(forKey: "panelSize") ?? "") ?? .comfortable {
+        didSet {
+            UserDefaults.standard.set(panelSize.rawValue, forKey: "panelSize")
+            Layout.expandedWidth = panelSize.size.width
+            Layout.contentHeight = panelSize.size.height
+        }
+    }
+
+    /// How long the pointer rests on the notch before it opens.
+    @Published var hoverDelay = HoverDelay(rawValue: UserDefaults.standard.string(forKey: "hoverDelay") ?? "") ?? .normal {
+        didSet { UserDefaults.standard.set(hoverDelay.rawValue, forKey: "hoverDelay") }
     }
 
     /// Bumped when a file lands on the notch, for the swallow animation.
@@ -79,6 +122,9 @@ final class AppModel: ObservableObject {
         disabledTabs = Set((UserDefaults.standard.stringArray(forKey: "disabledTabs") ?? []).compactMap(Tab.init(rawValue:)))
         let arranged = (UserDefaults.standard.stringArray(forKey: "tabOrder") ?? []).compactMap(Tab.init(rawValue:)).filter(Self.configurable.contains)
         order = arranged + Self.configurable.filter { !arranged.contains($0) }
+        Theme.accent = Style.current.color(for: tab)
+        Layout.expandedWidth = panelSize.size.width
+        Layout.contentHeight = panelSize.size.height
     }
 
     /// Tabs that can be turned off (Settings itself can't).
@@ -140,6 +186,7 @@ final class Services {
     let chat = ChatStore()
     let tools = ToolsStore()
     let screenTools = ScreenTools()
+    let market = MarketStore()
     let gitlab = GitLabStore()
     /// Opens Halu as a normal window that stays open; set by the app delegate.
     var openWindow: () -> Void = {}

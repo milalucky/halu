@@ -55,6 +55,8 @@ Header: left = Halu, tab title (truncates), weather pill (click opens the hidden
 
 Appearance (Settings): Black (default, melts into the notch), Dark Glass, Light Glass — glass modes draw the open panel with Liquid Glass (macOS 26 glassEffect, material fallback) and keep a black band behind the header; the header is always dark, the body follows the mode. Theme.primary/secondary/tertiary/card/hairline are adaptive (dark/light); use Theme.onPrimary for text on a primary fill. Header buttons share `.headerButton(active:tint:hovering:)` (26 pt circles). Claude session titles are cleaned of app markup (`ClaudeSession.cleanPrompt`).
 
+Settings → Appearance also has Colours (Style: Minimal / Playful / Neon — per-tab colour drives Theme.accent, Neon glows), Panel size (Compact 680×404 / Comfortable 780×440 default / Wide 880×480; Layout.expandedWidth/contentHeight are set by AppModel) and hover delay. Tools modes: Test data, Decode, Compare, Calculator (own safe parser — never NSExpression, it throws ObjC exceptions; units via Measurement; currencies from open.er-api.com), Emoji (Unicode names), Stocks (Yahoo Finance chart endpoint); plus Colour picker, Mirror (camera only while open) and Ruler. Clipboard entries can be pinned. Shelf images are OCR'd (Vision, ru+en) and searchable.
+
 Tabs are configurable in Settings (gear): all on by default; a disabled tab hides from the sidebar, pauses its store's background work (`isActive`), and drops its notch indicators.
 
 ## Roadmap

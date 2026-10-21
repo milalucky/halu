@@ -17,6 +17,29 @@ struct IntegrationsView: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .fixedSize()
+                HStack(spacing: 18) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Colours").font(Theme.caption(11, weight: .semibold)).foregroundStyle(Theme.tertiary)
+                        Picker("", selection: $model.style) {
+                            ForEach(Style.allCases) { Text($0.rawValue).tag($0) }
+                        }
+                        .pickerStyle(.segmented).labelsHidden().fixedSize()
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Panel size").font(Theme.caption(11, weight: .semibold)).foregroundStyle(Theme.tertiary)
+                        Picker("", selection: $model.panelSize) {
+                            ForEach(AppModel.PanelSize.allCases) { Text($0.rawValue).tag($0) }
+                        }
+                        .pickerStyle(.segmented).labelsHidden().fixedSize()
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Opens on hover").font(Theme.caption(11, weight: .semibold)).foregroundStyle(Theme.tertiary)
+                        Picker("", selection: $model.hoverDelay) {
+                            ForEach(AppModel.HoverDelay.allCases) { Text($0.rawValue).tag($0) }
+                        }
+                        .pickerStyle(.segmented).labelsHidden().fixedSize()
+                    }
+                }
                 SectionHeader(title: "Tabs", detail: "Drag or use the arrows to reorder · turned-off tabs stop working in the background")
                 VStack(spacing: 3) {
                     ForEach(Array(model.order.enumerated()), id: \.element) { index, tab in

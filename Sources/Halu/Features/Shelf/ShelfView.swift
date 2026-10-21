@@ -16,13 +16,16 @@ struct ShelfView: View {
                                   .font(Theme.caption(12, weight: .medium))
                                   .foregroundStyle(Theme.tertiary)
                           ))
+            if !store.items.isEmpty {
+                InputField(placeholder: "Search files and the text on screenshots", icon: "text.magnifyingglass", text: $store.query)
+            }
             if store.items.isEmpty {
                 EmptyState(icon: "tray.and.arrow.down", title: "Drop files here",
                            subtitle: "New screenshots and screen recordings appear here on their own. Drag them out wherever you need them.")
             } else {
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 12) {
-                        ForEach(store.items) { item in
+                        ForEach(store.visible) { item in
                             ShelfCard(item: item, store: store)
                         }
                     }

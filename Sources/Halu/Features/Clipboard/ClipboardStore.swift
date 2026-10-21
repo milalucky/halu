@@ -5,6 +5,23 @@ struct ClipEntry: Codable, Identifiable, Equatable {
     var text: String
     var copiedAt: Date
     var app: String?
+    /// Pinned entries stay at the top and aren't pushed out or cleared.
+    var pinned = false
+
+    init(text: String, copiedAt: Date, app: String?) {
+        self.text = text
+        self.copiedAt = copiedAt
+        self.app = app
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        text = try container.decode(String.self, forKey: .text)
+        copiedAt = try container.decode(Date.self, forKey: .copiedAt)
+        app = try container.decodeIfPresent(String.self, forKey: .app)
+        pinned = try container.decodeIfPresent(Bool.self, forKey: .pinned) ?? false
+    }
 }
 
 struct Snippet: Codable, Identifiable, Equatable {
@@ -80,8 +97,14 @@ final class ClipboardStore: ObservableObject {
         historyFile.save(history)
     }
 
+    func togglePin(_ entry: ClipEntry) {
+        guard let index = history.firstIndex(where: { $0.id == entry.id }) else { return }
+        history[index].pinned.toggle()
+        historyFile.save(history)
+    }
+
     func clearHistory() {
-        history.removeAll()
+        history.removeAll { !$0.pinned }
         historyFile.save(history)
     }
 
@@ -123,8 +146,16 @@ final class ClipboardStore: ObservableObject {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, text.count <= maxLength else { return }
         let previous = history.first { $0.text == text }
         history.removeAll { $0.text == text }
-        history.insert(ClipEntry(text: text, copiedAt: .now, app: app ?? previous?.app), at: 0)
-        if history.count > limit { history = Array(history.prefix(limit)) }
+        var entry = ClipEntry(text: text, copiedAt: .now, app: app ?? previous?.app)
+        entry.pinned = previous?.pinned ?? false
+        history.insert(entry, at: 0)
+        // The limit counts only unpinned entries.
+        var unpinned = 0
+        history = history.filter { entry in
+            if entry.pinned { return true }
+            unpinned += 1
+            return unpinned <= limit
+        }
         historyFile.save(history)
     }
 }

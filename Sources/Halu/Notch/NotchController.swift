@@ -27,7 +27,7 @@ final class NotchController {
     private var timer: Timer?
     private var idleDragCount = NSPasteboard(name: .drag).changeCount
 
-    private let hoverDelay: TimeInterval = 0.12
+    private var hoverDelay: TimeInterval { services.model.hoverDelay.seconds }
     private let leaveDelay: TimeInterval = 0.3
 
     init(services: Services) {

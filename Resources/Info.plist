@@ -32,6 +32,8 @@
     <string>Halu shows the current weather for where you are.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>Halu shows the current weather for where you are.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Halu shows your camera as a mirror before a call, only while the mirror is open.</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Halu listens only while you dictate a task or a translation.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
