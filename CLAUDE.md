@@ -17,7 +17,7 @@ Native SwiftUI + AppKit app that lives in the MacBook notch and in a virtual not
 1. Tasks — one to-do list, check off → archive ("Done"), voice input.
 2. Calendar — Google Calendar via EventKit, Join button, reminder pops out of the notch 10 min before.
 3. Claude — Claude Code sessions via hooks (`halu-hook`), progress bar, states, pop-out notices.
-4. Shelf — files, screenshots and screen recordings (watches the system screenshot folder).
+4. Shelf — files, screenshots and screen recordings (watches the system screenshot folder). Now a mode of the Clipboard tab (Clipboard | Shelf).
 5. Clipboard + Snippets (one tab).
 6. Translate — Google Translate EN↔RU, dictate by voice, copy the translation.
 7. Accounts — test accounts table (Service · Login · Password · Notes) in an AES-GCM vault file, key in Keychain. Import: Markdown lists/tables, CSV/TSV, clipboard rows (AccountImport), or `Halu --import-accounts <file>`. A service dropdown next to search filters by service; combined services ("losolo, losolo3", "StarSteer — losolo2") count for each part, URLs/hosts left out. Never commit account files.
@@ -39,11 +39,13 @@ Secrets live in ONE Keychain item (`com.milana.halu.secrets`), read once per lau
 
 Header right wing is narrow: VPN and Keep Awake are icon-only (details in tooltips). Keep Awake runs `caffeinate -dims` and is restored after Halu restarts.
 
-15. Chat — chatgpt.com (or claude.ai, perplexity.ai) in a WKWebView; the user signs in on the site, no tokens, no scraping or private APIs. One long-lived web view per site.
+15. Chat — chatgpt.com only, in a WKWebView, opened from a header button (not in the sidebar); the user signs in on the site, no tokens, no scraping or private APIs. One long-lived web view per site.
 16. Tools — Test data / Convert / Compare. Test data generator (click copies and regenerates; +alias emails from the user's own address) and Convert (paste anything: JWT, Base64, URL, JSON, timestamps, hashes).
 17. GitLab — your open MRs and MRs where you're a reviewer, new comments since you last opened each (comments fetched only when `user_notes_count` changes), read_api token in Keychain.
 
 Tasks have tags (#tag while typing, picker, filter; new tasks get the active filter's tag). Header shows live download speed (en* byte counters). VPN menu shows ping latency (pinged past the tunnel via `ping -b <Wi-Fi/Ethernet port>`; silence isn't failure) and switches to the next server when one doesn't connect in 25 s.
+
+The panel reopens on the last tab (hovering the notch mark doesn't jump to Messages/Claude). Clicking the Halu logo opens Halu as a normal resizable window (WindowRootView, same Sidebar + TabContent). Claude's sidebar icon is a monochrome burst (ClaudeMark). Header speed = busier of physical ports vs utun tunnels. The clipboard keeps everything, tokens included — the user chose that; don't filter.
 
 Tabs are configurable in Settings (gear): all on by default; a disabled tab hides from the sidebar, pauses its store's background work (`isActive`), and drops its notch indicators.
 

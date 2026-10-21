@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import ServiceManagement
 
 @MainActor
@@ -6,9 +7,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let services = Services.shared
     private var controller: NotchController?
     private var statusItem: NSStatusItem?
+    private var window: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         services.start()
+        services.openWindow = { [weak self] in self?.showWindow() }
         controller = NotchController(services: services)
         setupStatusItem()
         setupEditMenu()
@@ -27,7 +30,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         edit.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
 
         let main = NSMenu()
-        main.addItem(NSMenuItem(title: "Halu", action: nil, keyEquivalent: ""))
+        let app = NSMenu(title: "Halu")
+        app.addItem(withTitle: "Close Window", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        let appItem = NSMenuItem(title: "Halu", action: nil, keyEquivalent: "")
+        appItem.submenu = app
+        main.addItem(appItem)
         let editItem = NSMenuItem(title: "Edit", action: nil, keyEquivalent: "")
         editItem.submenu = edit
         main.addItem(editItem)
@@ -46,6 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
         menu.addItem(withTitle: "Open Halu", action: #selector(openPanel), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Open in a Window", action: #selector(openWindowItem), keyEquivalent: "").target = self
 
         let awake = menu.addItem(withTitle: "Keep Mac Awake", action: #selector(toggleAwake), keyEquivalent: "")
         awake.target = self
@@ -60,6 +68,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func openPanel() { controller?.openOnPointerScreen() }
+
+    @objc private func openWindowItem() { showWindow() }
+
+    /// Halu as an ordinary window, for working in a tab for longer: it doesn't hide when the pointer leaves.
+    private func showWindow() {
+        controller?.collapseAll()
+        if window == nil {
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 920, height: 600),
+                                  styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+                                  backing: .buffered, defer: false)
+            window.title = "Halu"
+            window.titlebarAppearsTransparent = true
+            window.titleVisibility = .hidden
+            window.isReleasedWhenClosed = false
+            window.appearance = NSAppearance(named: .darkAqua)
+            window.backgroundColor = .black
+            window.minSize = NSSize(width: 720, height: 460)
+            window.contentView = NSHostingView(rootView: WindowRootView(model: services.model, services: services))
+            window.center()
+            window.setFrameAutosaveName("HaluWindow")
+            self.window = window
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        window?.makeKeyAndOrderFront(nil)
+    }
 
     @objc private func toggleAwake() { services.awake.toggle() }
 

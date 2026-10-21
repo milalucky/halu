@@ -18,7 +18,7 @@ struct VPNButton: View {
                     .font(.system(size: 12, weight: .semibold))
                     .symbolEffect(.pulse, options: .repeating, isActive: vpn.isConnecting)
                     .foregroundStyle(tint)
-                    .frame(width: 26, height: 22)
+                    .frame(width: 24, height: 22)
                     .background(Capsule().fill(active != nil ? tint.opacity(0.15) : (hovering ? Theme.card : .clear)))
                     .contentShape(Capsule())
             }
@@ -74,9 +74,11 @@ struct VPNButton: View {
         }
     }
 
-    /// "  ·  190 ms" for servers that answer a ping.
+    /// "  ·  190 ms" for servers that answer a ping, "  ·  no ping" for those that ignore it (many VPN
+    /// servers do; it doesn't mean they're down). Nothing while there's no measurement.
     private func detail(_ connection: VPNController.Connection) -> String {
-        guard let ms = vpn.latency[connection.id] ?? nil else { return "" }
+        guard let measured = vpn.latency[connection.id] else { return "" }
+        guard let ms = measured else { return "  ·  no ping" }
         return "  ·  \(Int(ms.rounded())) ms"
     }
 

@@ -1,46 +1,24 @@
 import AppKit
 import WebKit
 
-/// ChatGPT (or Claude, Perplexity) as its own website in a small browser inside the panel: you sign
-/// in there yourself, like in Safari, and use your own subscription. Halu doesn't see or keep the
-/// sign-in; the site's cookies live in WebKit's store and survive restarts. Each site keeps one web
-/// view alive, so a conversation stays put while the panel is closed.
+/// ChatGPT as its own website in a small browser inside the panel: you sign in there yourself, like in
+/// Safari, and use your own subscription. Halu doesn't see or keep the sign-in; the site's cookies live
+/// in WebKit's store and survive restarts. One web view stays alive, so a conversation stays put while
+/// the panel is closed.
 @MainActor
 final class ChatStore: NSObject, ObservableObject, WKUIDelegate, WKNavigationDelegate {
-    enum Service: String, CaseIterable, Identifiable {
-        case chatGPT = "ChatGPT", claude = "Claude", perplexity = "Perplexity"
+    private static let home = URL(string: "https://chatgpt.com")!
+    /// Hosts that belong to ChatGPT and its sign-in; other links open in the default browser.
+    private static let hosts = ["chatgpt.com", "openai.com", "auth0.com"]
 
-        var id: String { rawValue }
-
-        var home: URL {
-            switch self {
-            case .chatGPT: URL(string: "https://chatgpt.com")!
-            case .claude: URL(string: "https://claude.ai/new")!
-            case .perplexity: URL(string: "https://www.perplexity.ai")!
-            }
-        }
-
-        /// Hosts that belong to the site and its sign-in; other links open in the default browser.
-        var hosts: [String] {
-            switch self {
-            case .chatGPT: ["chatgpt.com", "openai.com", "auth0.com"]
-            case .claude: ["claude.ai", "anthropic.com"]
-            case .perplexity: ["perplexity.ai"]
-            }
-        }
-    }
-
-    @Published var service = Service(rawValue: UserDefaults.standard.string(forKey: "chat.service") ?? "") ?? .chatGPT {
-        didSet { UserDefaults.standard.set(service.rawValue, forKey: "chat.service") }
-    }
     @Published private(set) var isLoading = false
 
-    private var views: [Service: WKWebView] = [:]
+    private var view: WKWebView?
     /// Sign-in pages of identity providers stay in the panel (Google, Apple, Microsoft).
     private let signInHosts = ["accounts.google.com", "appleid.apple.com", "login.microsoftonline.com", "login.live.com"]
 
     var webView: WKWebView {
-        if let view = views[service] { return view }
+        if let view { return view }
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default()
         let view = WKWebView(frame: .zero, configuration: configuration)
@@ -50,22 +28,22 @@ final class ChatStore: NSObject, ObservableObject, WKUIDelegate, WKNavigationDel
         view.navigationDelegate = self
         view.allowsBackForwardNavigationGestures = true
         view.setValue(false, forKey: "drawsBackground")
-        view.load(URLRequest(url: service.home))
-        views[service] = view
+        view.load(URLRequest(url: Self.home))
+        self.view = view
         return view
     }
 
-    func goHome() { webView.load(URLRequest(url: service.home)) }
+    func goHome() { webView.load(URLRequest(url: Self.home)) }
     func reload() { webView.reload() }
     func goBack() { if webView.canGoBack { webView.goBack() } }
 
     func openInBrowser() {
-        NSWorkspace.shared.open(webView.url ?? service.home)
+        NSWorkspace.shared.open(webView.url ?? Self.home)
     }
 
     private func belongs(_ url: URL) -> Bool {
         guard let host = url.host?.lowercased() else { return true }
-        return (service.hosts + signInHosts).contains { host == $0 || host.hasSuffix("." + $0) }
+        return (Self.hosts + signInHosts).contains { host == $0 || host.hasSuffix("." + $0) }
     }
 
     // MARK: WKUIDelegate

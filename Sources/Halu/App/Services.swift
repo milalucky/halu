@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 enum Tab: String, CaseIterable, Identifiable {
-    case tasks, calendar, claude, chat, jira, gitlab, messages, shelf, clipboard, translate, tools, accounts, notes, media, settings
+    case tasks, calendar, claude, chat, jira, gitlab, messages, clipboard, translate, tools, accounts, notes, media, settings
 
     var id: String { rawValue }
 
@@ -12,7 +12,6 @@ enum Tab: String, CaseIterable, Identifiable {
         case .calendar: "Calendar"
         case .claude: "Claude"
         case .chat: "Chat"
-        case .shelf: "Shelf"
         case .clipboard: "Clipboard"
         case .translate: "Translate"
         case .tools: "Tools"
@@ -32,7 +31,6 @@ enum Tab: String, CaseIterable, Identifiable {
         case .calendar: "calendar"
         case .claude: "sparkle"
         case .chat: "bubble.left.circle"
-        case .shelf: "tray.full"
         case .clipboard: "doc.on.clipboard"
         case .translate: "character.bubble"
         case .tools: "wrench.and.screwdriver"
@@ -59,12 +57,14 @@ final class AppModel: ObservableObject {
     init() {
         // Compare used to be its own tab; it lives in Tools now.
         let saved = UserDefaults.standard.string(forKey: "selectedTab")
-        tab = saved == "compare" ? .tools : saved.flatMap(Tab.init(rawValue:)) ?? .tasks
+        // Shelf is a mode of Clipboard now, and Compare of Tools.
+        tab = saved == "compare" ? .tools : saved == "shelf" ? .clipboard : saved.flatMap(Tab.init(rawValue:)) ?? .tasks
         disabledTabs = Set((UserDefaults.standard.stringArray(forKey: "disabledTabs") ?? []).compactMap(Tab.init(rawValue:)))
     }
 
     /// Tabs that can be turned off (Settings itself can't).
-    static let configurable = Tab.allCases.filter { $0 != .settings }
+    /// Chat opens from its header button, not the sidebar.
+    static let configurable = Tab.allCases.filter { $0 != .settings && $0 != .chat }
 
     func isEnabled(_ tab: Tab) -> Bool { !disabledTabs.contains(tab) }
 
@@ -106,6 +106,8 @@ final class Services {
     let chat = ChatStore()
     let tools = ToolsStore()
     let gitlab = GitLabStore()
+    /// Opens Halu as a normal window that stays open; set by the app delegate.
+    var openWindow: () -> Void = {}
     let vpn = VPNController()
     let speed = NetworkSpeed()
 
@@ -128,7 +130,7 @@ final class Services {
         jira.isActive = { model.isEnabled(.jira) }
         media.isActive = { model.isEnabled(.media) }
         messages.isActive = { model.isEnabled(.messages) }
-        shelf.isActive = { model.isEnabled(.shelf) }
+        shelf.isActive = { model.isEnabled(.clipboard) }
         calendar.onReminder = { [notices] meeting, startsNow in
             notices.post(.meeting(meeting, startsNow: startsNow))
         }

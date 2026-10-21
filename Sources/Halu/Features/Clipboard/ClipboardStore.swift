@@ -20,6 +20,16 @@ final class ClipboardStore: ObservableObject {
     /// False while the tab is turned off in Settings: background work pauses.
     var isActive: () -> Bool = { true }
 
+    enum Mode: String, CaseIterable, Identifiable {
+        case clipboard = "Clipboard", shelf = "Shelf"
+        var id: String { rawValue }
+    }
+
+    /// Clipboard history and snippets, or the Shelf of files and screenshots; kept between openings.
+    @Published var mode = Mode(rawValue: UserDefaults.standard.string(forKey: "clipboard.mode") ?? "") ?? .clipboard {
+        didSet { UserDefaults.standard.set(mode.rawValue, forKey: "clipboard.mode") }
+    }
+
     @Published private(set) var history: [ClipEntry]
     @Published private(set) var snippets: [Snippet]
     /// The snippet being written, kept here so it survives the panel closing.

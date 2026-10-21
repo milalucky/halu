@@ -1,5 +1,26 @@
 import SwiftUI
 
+/// Clipboard and Shelf in one tab.
+struct ClipboardTab: View {
+    @ObservedObject var clipboard: ClipboardStore
+    let shelf: ShelfStore
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Picker("", selection: $clipboard.mode) {
+                ForEach(ClipboardStore.Mode.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
+            switch clipboard.mode {
+            case .clipboard: ClipboardView(store: clipboard)
+            case .shelf: ShelfView(store: shelf)
+            }
+        }
+    }
+}
+
 struct ClipboardView: View {
     @ObservedObject var store: ClipboardStore
     @State private var query = ""

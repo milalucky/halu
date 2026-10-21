@@ -7,12 +7,7 @@ struct ChatView: View {
     var body: some View {
         VStack(spacing: 8) {
             HStack(spacing: 6) {
-                Picker("", selection: $store.service) {
-                    ForEach(ChatStore.Service.allCases) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
+                Text("ChatGPT").font(Theme.body(12.5, weight: .semibold)).foregroundStyle(Theme.secondary)
                 if store.isLoading { ProgressView().controlSize(.mini) }
                 Spacer()
                 IconButton(icon: "chevron.left", help: "Back", action: store.goBack)
@@ -21,7 +16,6 @@ struct ChatView: View {
                 IconButton(icon: "safari", help: "Open in your browser", action: store.openInBrowser)
             }
             WebViewHost(webView: store.webView)
-                .id(store.service)
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline))
         }
@@ -57,5 +51,36 @@ private struct WebViewHost: NSViewRepresentable {
             webView.window?.makeKey()
             webView.window?.makeFirstResponder(webView)
         }
+    }
+}
+
+/// Header button: opens ChatGPT in the panel, and a second click goes back to the tab you were on.
+struct ChatButton: View {
+    @ObservedObject var model: AppModel
+    @State private var hovering = false
+    @State private var previous: Tab?
+
+    var body: some View {
+        let on = model.tab == .chat
+        Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                if on {
+                    model.tab = previous ?? .tasks
+                } else {
+                    previous = model.tab
+                    model.tab = .chat
+                }
+            }
+        } label: {
+            Image(systemName: on ? "bubble.left.and.text.bubble.right.fill" : "bubble.left.and.text.bubble.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(on ? Theme.primary : (hovering ? Theme.secondary : Theme.tertiary))
+                .frame(width: 24, height: 22)
+                .background(Capsule().fill(on ? Color.white.opacity(0.12) : (hovering ? Theme.card : .clear)))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help(on ? "Back to \(previous?.title ?? "Tasks")" : "ChatGPT")
     }
 }

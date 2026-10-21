@@ -114,6 +114,11 @@ final class NotchController {
         if !panel.state.isExpanded { panel.state.isExpanded = true }
     }
 
+    /// Closes the panel on every display (the full window is taking over).
+    func collapseAll() {
+        panels.values.forEach(collapse)
+    }
+
     private func collapse(_ panel: ScreenPanel) {
         guard panel.state.isExpanded else { return }
         panel.state.isExpanded = false
@@ -159,13 +164,19 @@ final class NotchController {
                 if g.isInTrigger(point, width: triggerWidth) {
                     if isFileDrag {
                         // Files dragged to the notch go to the Shelf, unless Compare is open and waiting for them.
-                        expand(panel, tab: services.model.tab == .tools && services.tools.mode == .compare ? nil : .shelf)
+                        if services.model.tab == .tools && services.tools.mode == .compare {
+                            expand(panel, tab: nil)
+                        } else {
+                            services.clipboard.mode = .shelf
+                            expand(panel, tab: .clipboard)
+                        }
                     } else if buttons == 0 {
                         let since = panel.hoverSince ?? now
                         panel.hoverSince = since
                         // Hovering the indicators opens straight to what they point at.
                         if now.timeIntervalSince(since) >= hoverDelay {
-                            expand(panel, tab: current == .badge ? services.attentionTab : nil)
+                            // Opens where you left off; a click on the mark goes to what's waiting.
+                            expand(panel, tab: nil)
                         }
                     }
                 } else {

@@ -1,14 +1,15 @@
 import Darwin
 import SwiftUI
 
-/// Live download and upload speed of the Mac, from the byte counters of its network ports. Tunnels
-/// (utun, used by VPNs) and loopback are left out so traffic isn't counted twice.
+/// Live download and upload speed of the Mac, from the byte counters of its network interfaces.
+/// With a VPN on, macOS may count the traffic only on the tunnel (utun), so the busier of the two
+/// groups — physical ports or tunnels — is shown, never their sum, so nothing is counted twice.
 @MainActor
 final class NetworkSpeed: ObservableObject {
     @Published private(set) var down: Double = 0
     @Published private(set) var up: Double = 0
 
-    private var last: (received: UInt64, sent: UInt64, at: Date)?
+    private var last: (counters: [String: (UInt64, UInt64)], at: Date)?
     private var timer: Timer?
 
     /// Measures only while the header shows it.
@@ -30,30 +31,40 @@ final class NetworkSpeed: ObservableObject {
 
     private func sample() {
         let now = Date()
-        let (received, sent) = Self.counters()
-        if let last, received >= last.received, sent >= last.sent {
+        let counters = Self.counters()
+        if let last {
             let seconds = now.timeIntervalSince(last.at)
-            down = Double(received - last.received) / seconds
-            up = Double(sent - last.sent) / seconds
+            var ports: (Double, Double) = (0, 0), tunnels: (Double, Double) = (0, 0)
+            for (name, value) in counters {
+                guard let old = last.counters[name], value.0 >= old.0, value.1 >= old.1 else { continue }
+                let delta = (Double(value.0 - old.0) / seconds, Double(value.1 - old.1) / seconds)
+                if name.hasPrefix("utun") {
+                    tunnels = (tunnels.0 + delta.0, tunnels.1 + delta.1)
+                } else {
+                    ports = (ports.0 + delta.0, ports.1 + delta.1)
+                }
+            }
+            down = max(ports.0, tunnels.0)
+            up = max(ports.1, tunnels.1)
         }
-        last = (received, sent, now)
+        last = (counters, now)
     }
 
-    private nonisolated static func counters() -> (UInt64, UInt64) {
+    /// Bytes received and sent per interface: Wi-Fi/Ethernet ports (en) and VPN tunnels (utun).
+    private nonisolated static func counters() -> [String: (UInt64, UInt64)] {
         var list: UnsafeMutablePointer<ifaddrs>?
-        guard getifaddrs(&list) == 0, let first = list else { return (0, 0) }
+        guard getifaddrs(&list) == 0, let first = list else { return [:] }
         defer { freeifaddrs(list) }
-        var received: UInt64 = 0, sent: UInt64 = 0
+        var result: [String: (UInt64, UInt64)] = [:]
         for pointer in sequence(first: first, next: { $0.pointee.ifa_next }) {
             let entry = pointer.pointee
             guard let address = entry.ifa_addr, address.pointee.sa_family == UInt8(AF_LINK), let data = entry.ifa_data else { continue }
             let name = String(cString: entry.ifa_name)
-            guard name.hasPrefix("en") else { continue }
+            guard name.hasPrefix("en") || name.hasPrefix("utun") else { continue }
             let stats = data.assumingMemoryBound(to: if_data.self).pointee
-            received += UInt64(stats.ifi_ibytes)
-            sent += UInt64(stats.ifi_obytes)
+            result[name] = (UInt64(stats.ifi_ibytes), UInt64(stats.ifi_obytes))
         }
-        return (received, sent)
+        return result
     }
 
     /// "2.1M", "340K", "0" — short enough for the header. Bytes per second.

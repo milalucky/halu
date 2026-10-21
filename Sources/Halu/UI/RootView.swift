@@ -62,6 +62,31 @@ struct RootView: View {
     }
 }
 
+/// The selected tab's screen; the same in the notch panel and the full window.
+struct TabContent: View {
+    @ObservedObject var model: AppModel
+    let services: Services
+
+    var body: some View {
+        switch model.tab {
+        case .tasks: TasksView(store: services.tasks, speech: services.speech)
+        case .calendar: CalendarView(store: services.calendar)
+        case .claude: ClaudeView(store: services.claude)
+        case .chat: ChatView(store: services.chat)
+        case .clipboard: ClipboardTab(clipboard: services.clipboard, shelf: services.shelf)
+        case .translate: TranslateView(store: services.translate, speech: services.speech)
+        case .tools: ToolsView(store: services.tools, compare: services.compare)
+        case .accounts: AccountsView(store: services.accounts)
+        case .notes: NotesView(store: services.notes)
+        case .media: MediaView(store: services.media)
+        case .messages: MessagesView(store: services.messages)
+        case .jira: JiraView(store: services.jira) { model.tab = .settings }
+        case .gitlab: GitLabView(store: services.gitlab) { model.tab = .settings }
+        case .settings: IntegrationsView(model: model, jira: services.jira, gitlab: services.gitlab, messages: services.messages)
+        }
+    }
+}
+
 struct ExpandedView: View {
     @ObservedObject var model: AppModel
     let services: Services
@@ -74,25 +99,7 @@ struct ExpandedView: View {
             HStack(spacing: 0) {
                 Sidebar(model: model, claude: services.claude, media: services.media, messages: services.messages, gitlab: services.gitlab)
                 Rectangle().fill(Theme.hairline).frame(width: 1).padding(.vertical, 6)
-                Group {
-                    switch model.tab {
-                    case .tasks: TasksView(store: services.tasks, speech: services.speech)
-                    case .calendar: CalendarView(store: services.calendar)
-                    case .claude: ClaudeView(store: services.claude)
-                    case .chat: ChatView(store: services.chat)
-                    case .shelf: ShelfView(store: services.shelf)
-                    case .clipboard: ClipboardView(store: services.clipboard)
-                    case .translate: TranslateView(store: services.translate, speech: services.speech)
-                    case .tools: ToolsView(store: services.tools, compare: services.compare)
-                    case .accounts: AccountsView(store: services.accounts)
-                    case .notes: NotesView(store: services.notes)
-                    case .media: MediaView(store: services.media)
-                    case .messages: MessagesView(store: services.messages)
-                    case .jira: JiraView(store: services.jira) { model.tab = .settings }
-                    case .gitlab: GitLabView(store: services.gitlab) { model.tab = .settings }
-                    case .settings: IntegrationsView(model: model, jira: services.jira, gitlab: services.gitlab, messages: services.messages)
-                    }
-                }
+                TabContent(model: model, services: services)
                 .padding(.leading, 18)
                 .padding(.trailing, 20)
                 .padding(.top, 4)
@@ -106,7 +113,8 @@ struct ExpandedView: View {
                 services.compare.load(providers: providers)
                 return true
             }
-            model.tab = .shelf
+            model.tab = .clipboard
+            services.clipboard.mode = .shelf
             services.shelf.add(providers: providers)
             return true
         }
@@ -135,9 +143,16 @@ struct HeaderBar: View {
         HStack(spacing: 0) {
             HStack(spacing: 8) {
                 // The mark runs only on the Claude tab, while a session is working.
-                HaluMark(size: 15, color: Theme.primary,
-                         animating: model.tab == .claude && claude.rows.contains { $0.phase == .working })
-                Text("Halu").font(Theme.title(14)).foregroundStyle(Theme.primary)
+                Button { Services.shared.openWindow() } label: {
+                    HStack(spacing: 8) {
+                        HaluMark(size: 15, color: Theme.primary,
+                                 animating: model.tab == .claude && claude.rows.contains { $0.phase == .working })
+                        Text("Halu").font(Theme.title(14)).foregroundStyle(Theme.primary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Open Halu in a window")
                 Text(model.tab.title)
                     .font(Theme.title(14))
                     .foregroundStyle(Theme.tertiary)
@@ -149,8 +164,9 @@ struct HeaderBar: View {
 
             Spacer(minLength: 0)
 
-            HStack(spacing: 10) {
+            HStack(spacing: 6) {
                 SpeedLabel(speed: speed)
+                ChatButton(model: model)
                 VPNButton(vpn: vpn)
                 AwakeButton(awake: awake)
                 TimelineView(.periodic(from: .now, by: 15)) { context in
@@ -183,7 +199,7 @@ struct Sidebar: View {
     /// Media only shows up while something plays or sits paused.
     private var tabs: [Tab] {
         Tab.allCases.filter { tab in
-            guard tab != .settings, model.isEnabled(tab) else { return false }
+            guard tab != .settings, tab != .chat, model.isEnabled(tab) else { return false }
             return tab != .media || media.source != nil || model.tab == .media
         }
     }
@@ -236,9 +252,17 @@ struct TabButton: View {
                 } else if hovering {
                     RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.card)
                 }
-                Image(systemName: tab.icon)
-                    .font(.system(size: 14, weight: selected ? .semibold : .regular))
-                    .foregroundStyle(selected ? Theme.primary : (hovering ? Theme.secondary : Theme.tertiary))
+                Group {
+                    if tab == .claude {
+                        ClaudeMark()
+                            .stroke(style: StrokeStyle(lineWidth: selected ? 1.9 : 1.6, lineCap: .round))
+                            .frame(width: 15, height: 15)
+                    } else {
+                        Image(systemName: tab.icon)
+                            .font(.system(size: 14, weight: selected ? .semibold : .regular))
+                    }
+                }
+                .foregroundStyle(selected ? Theme.primary : (hovering ? Theme.secondary : Theme.tertiary))
             }
             .frame(width: 38, height: height)
             .overlay(alignment: .topTrailing) {
@@ -276,7 +300,7 @@ struct AwakeButton: View {
                 .symbolEffect(.variableColor.iterative.reversing, options: .repeating, isActive: awake.isOn)
                 .symbolEffect(.bounce, value: awake.isOn)
             .foregroundStyle(awake.isOn ? Theme.orange : (hovering ? Theme.secondary : Theme.tertiary))
-            .frame(width: 26, height: 22)
+            .frame(width: 24, height: 22)
             .background(Capsule().fill(awake.isOn ? Theme.orange.opacity(0.15) : (hovering ? Theme.card : .clear)))
             .contentShape(Capsule())
         }
@@ -323,5 +347,23 @@ struct BadgeView: View {
         .onAppear {
             withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) { glow = true }
         }
+    }
+}
+
+/// A burst of uneven rays, in the spirit of Claude's mark, drawn in the sidebar's own monochrome style.
+struct ClaudeMark: Shape {
+    func path(in rect: CGRect) -> Path {
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let radius = min(rect.width, rect.height) / 2
+        // Ray lengths go round the circle; the unevenness is what makes it read as hand-drawn.
+        let lengths: [CGFloat] = [1.0, 0.72, 0.9, 0.66, 0.97, 0.75, 0.86, 0.62, 1.0, 0.7, 0.92, 0.68]
+        var path = Path()
+        for (index, length) in lengths.enumerated() {
+            let angle = CGFloat(index) / CGFloat(lengths.count) * 2 * .pi - .pi / 2
+            let inner = radius * 0.22, outer = radius * length
+            path.move(to: CGPoint(x: center.x + inner * cos(angle), y: center.y + inner * sin(angle)))
+            path.addLine(to: CGPoint(x: center.x + outer * cos(angle), y: center.y + outer * sin(angle)))
+        }
+        return path
     }
 }
