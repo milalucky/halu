@@ -1,5 +1,5 @@
 import AVFoundation
-import Speech
+@preconcurrency import Speech
 
 /// Dictation into a text field. Shared by every voice-enabled field; one recording at a time.
 @MainActor
