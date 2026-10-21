@@ -80,3 +80,16 @@ public enum HaluJSON {
         return decoder
     }
 }
+
+public extension ClaudeSession {
+    /// What a person typed, without the blocks apps wrap around a prompt (`<system-reminder>`,
+    /// slash-command markup and the like), on one line.
+    static func cleanPrompt(_ text: String) -> String {
+        var result = text
+        let blocks = #"<(system-reminder|command-name|command-message|command-args|local-command-stdout|local-command-caveat|user-prompt-submit-hook|ide_[a-z_]+)[^>]*>[\s\S]*?</\1>"#
+        result = result.replacingOccurrences(of: blocks, with: " ", options: .regularExpression)
+        // An unclosed system block runs to the end.
+        result = result.replacingOccurrences(of: #"<system-reminder>[\s\S]*$"#, with: " ", options: .regularExpression)
+        return result.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression).trimmingCharacters(in: .whitespaces)
+    }
+}

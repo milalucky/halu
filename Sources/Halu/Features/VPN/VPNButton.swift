@@ -18,9 +18,7 @@ struct VPNButton: View {
                     .font(.system(size: 12, weight: .semibold))
                     .symbolEffect(.pulse, options: .repeating, isActive: vpn.isConnecting)
                     .foregroundStyle(tint)
-                    .frame(width: 24, height: 22)
-                    .background(Capsule().fill(active != nil ? tint.opacity(0.15) : (hovering ? Theme.card : .clear)))
-                    .contentShape(Capsule())
+                    .headerButton(active: active != nil, tint: tint, hovering: hovering)
             }
             .menuStyle(.button)
             .buttonStyle(.plain)

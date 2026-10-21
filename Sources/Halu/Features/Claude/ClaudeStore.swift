@@ -2,7 +2,10 @@ import AppKit
 import HaluCore
 
 extension ClaudeSession {
-    var displayTitle: String { title.isEmpty ? project : title }
+    var displayTitle: String {
+        let clean = ClaudeSession.cleanPrompt(title)
+        return clean.isEmpty ? project : clean
+    }
 }
 
 /// How a session reads to the user. A finished turn is not a finished session: it stays

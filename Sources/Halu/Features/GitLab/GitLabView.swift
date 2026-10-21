@@ -75,10 +75,10 @@ private struct Chip: View {
         Button(action: action) {
             HStack(spacing: 4) {
                 Text(title)
-                Text("\(count)").foregroundStyle(selected ? Color.black.opacity(0.5) : Theme.tertiary)
+                Text("\(count)").foregroundStyle(selected ? Theme.onPrimary.opacity(0.6) : Theme.tertiary)
             }
             .font(Theme.caption(11.5, weight: .semibold))
-            .foregroundStyle(selected ? Color.black.opacity(0.85) : Theme.secondary)
+            .foregroundStyle(selected ? Theme.onPrimary : Theme.secondary)
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
             .background(Capsule().fill(selected ? Theme.primary : Theme.card))

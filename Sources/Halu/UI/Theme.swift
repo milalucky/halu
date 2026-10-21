@@ -7,12 +7,27 @@ enum Theme {
     static let red = Color(red: 1.00, green: 0.45, blue: 0.45)
     static let blue = Color(red: 0.50, green: 0.74, blue: 1.00)
 
-    static let primary = Color.white.opacity(0.92)
-    static let secondary = Color.white.opacity(0.55)
-    static let tertiary = Color.white.opacity(0.32)
-    static let card = Color.white.opacity(0.055)
-    static let cardHover = Color.white.opacity(0.095)
-    static let hairline = Color.white.opacity(0.08)
+    // Text and surfaces follow the light or dark look of where they're drawn (Settings → Appearance).
+    static let primary = adaptive(dark: 0.92, light: 0.86)
+    static let secondary = adaptive(dark: 0.55, light: 0.58)
+    static let tertiary = adaptive(dark: 0.32, light: 0.38)
+    static let card = adaptive(dark: 0.055, light: 0.06)
+    static let cardHover = adaptive(dark: 0.095, light: 0.1)
+    static let hairline = adaptive(dark: 0.08, light: 0.1)
+
+    /// Text on a `primary` fill (a selected chip): dark on the light chip of dark mode and the reverse.
+    static let onPrimary = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .aqua ? NSColor.white : NSColor.black.withAlphaComponent(0.85)
+    })
+
+    /// White at `dark` opacity on dark backgrounds, black at `light` opacity on light ones.
+    private static func adaptive(dark: CGFloat, light: CGFloat) -> Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .aqua
+                ? NSColor.black.withAlphaComponent(light)
+                : NSColor.white.withAlphaComponent(dark)
+        })
+    }
 
     static func title(_ size: CGFloat = 15) -> Font { .system(size: size, weight: .semibold, design: .rounded) }
     static func body(_ size: CGFloat = 13, weight: Font.Weight = .regular) -> Font { .system(size: size, weight: weight) }

@@ -92,7 +92,9 @@ struct SpeedLabel: View {
         .font(Theme.caption(11, weight: .semibold))
         .foregroundStyle(speed.down > 1024 * 100 ? Theme.secondary : Theme.tertiary)
         .lineLimit(1)
-        .fixedSize()
+        // A steady width, so the buttons beside it don't jump as the number changes.
+        .frame(width: 44, alignment: .trailing)
+        .padding(.trailing, 4)
         .help("Download \(NetworkSpeed.long(speed.down)) · upload \(NetworkSpeed.long(speed.up))")
         .onAppear(perform: speed.start)
         .onDisappear(perform: speed.stop)

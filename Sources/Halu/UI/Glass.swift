@@ -35,3 +35,14 @@ struct Burst: View {
         .onAppear { withAnimation(.easeOut(duration: 0.55)) { fired = true } }
     }
 }
+
+extension View {
+    /// The look every header button shares: a 26 pt circle, tinted while its thing is on, lit on hover.
+    func headerButton(active: Bool, tint: Color = Theme.primary, hovering: Bool) -> some View {
+        frame(width: 26, height: 26)
+            .background(Circle().fill(active ? tint.opacity(0.2) : (hovering ? Color.white.opacity(0.08) : .clear)))
+            .overlay(Circle().strokeBorder(active ? tint.opacity(0.35) : .clear, lineWidth: 1))
+            .contentShape(Circle())
+            .animation(.easeOut(duration: 0.15), value: hovering)
+    }
+}

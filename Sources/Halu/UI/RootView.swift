@@ -29,8 +29,7 @@ struct RootView: View {
         let lifted = display == .expanded || display == .notice || display == .request
 
         ZStack(alignment: .top) {
-            shape
-                .fill(Color.black)
+            PanelBackground(shape: shape, glass: lifted ? model.appearance : .black, headerHeight: Layout.headerHeight(state.geometry))
                 .shadow(color: .black.opacity(lifted ? 0.55 : 0), radius: 22, y: 10)
             content(display)
                 .frame(width: size.width, height: size.height, alignment: .top)
@@ -112,6 +111,43 @@ struct TabContent: View {
     }
 }
 
+/// Black like the notch, or Liquid Glass with a black band along the top so the notch still melts in.
+struct PanelBackground: View {
+    let shape: NotchShape
+    let glass: AppModel.Appearance
+    let headerHeight: CGFloat
+
+    var body: some View {
+        switch glass {
+        case .black:
+            shape.fill(Color.black)
+        case .darkGlass, .lightGlass:
+            let light = glass == .lightGlass
+            ZStack(alignment: .top) {
+                Color.clear.modifier(GlassFill(shape: shape, light: light))
+                LinearGradient(stops: [.init(color: .black, location: 0), .init(color: .black, location: 0.7), .init(color: .black.opacity(0), location: 1)],
+                               startPoint: .top, endPoint: .bottom)
+                    .frame(height: headerHeight + 10)
+                    .clipShape(shape)
+            }
+        }
+    }
+}
+
+private struct GlassFill: ViewModifier {
+    let shape: NotchShape
+    let light: Bool
+
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content.glassEffect(.regular.tint(light ? Color.white.opacity(0.55) : Color.black.opacity(0.45)), in: shape)
+        } else {
+            content.background(light ? .regularMaterial : .ultraThinMaterial, in: shape)
+                .background(shape.fill(light ? Color.white.opacity(0.5) : Color.black.opacity(0.5)))
+        }
+    }
+}
+
 struct ExpandedView: View {
     @ObservedObject var model: AppModel
     let services: Services
@@ -121,6 +157,7 @@ struct ExpandedView: View {
     var body: some View {
         VStack(spacing: 0) {
             HeaderBar(model: model, awake: services.awake, vpn: services.vpn, speed: services.speed, claude: services.claude, geometry: geometry)
+                .environment(\.colorScheme, .dark)
             HStack(spacing: 0) {
                 Sidebar(model: model, claude: services.claude, media: services.media, messages: services.messages, gitlab: services.gitlab)
                 Rectangle().fill(Theme.hairline).frame(width: 1).padding(.vertical, 6)
@@ -131,6 +168,7 @@ struct ExpandedView: View {
                 .padding(.bottom, 16)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
+            .environment(\.colorScheme, model.appearance == .lightGlass ? .light : .dark)
         }
         .onDrop(of: [.fileURL], isTargeted: $dropTargeted) { providers in
             // On Tools → Compare a drop anywhere fills the empty side; elsewhere files go to the Shelf.
@@ -209,7 +247,7 @@ struct HeaderBar: View {
 
             Spacer(minLength: 0)
 
-            HStack(spacing: 6) {
+            HStack(spacing: 2) {
                 ClaudeUsagePill(requests: Services.shared.claudeRequests)
                 SpeedLabel(speed: speed)
                 ChatButton(model: model)
@@ -337,9 +375,7 @@ struct AwakeButton: View {
                 .symbolEffect(.variableColor.iterative.reversing, options: .repeating, isActive: awake.isOn)
                 .symbolEffect(.bounce, value: awake.isOn)
             .foregroundStyle(awake.isOn ? Theme.orange : (hovering ? Theme.secondary : Theme.tertiary))
-            .frame(width: 24, height: 22)
-            .background(Capsule().fill(awake.isOn ? Theme.orange.opacity(0.15) : (hovering ? Theme.card : .clear)))
-            .contentShape(Capsule())
+            .headerButton(active: awake.isOn, tint: Theme.orange, hovering: hovering)
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }

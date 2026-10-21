@@ -10,6 +10,13 @@ struct IntegrationsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
+                SectionHeader(title: "Appearance", detail: "How the open panel looks")
+                Picker("", selection: $model.appearance) {
+                    ForEach(AppModel.Appearance.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
                 SectionHeader(title: "Tabs", detail: "Drag or use the arrows to reorder · turned-off tabs stop working in the background")
                 VStack(spacing: 3) {
                     ForEach(Array(model.order.enumerated()), id: \.element) { index, tab in

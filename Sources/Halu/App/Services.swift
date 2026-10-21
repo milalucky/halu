@@ -53,6 +53,16 @@ final class AppModel: ObservableObject {
         didSet { UserDefaults.standard.set(tab.rawValue, forKey: "selectedTab") }
     }
 
+    enum Appearance: String, CaseIterable, Identifiable {
+        case black = "Black", darkGlass = "Dark Glass", lightGlass = "Light Glass"
+        var id: String { rawValue }
+    }
+
+    /// How the open panel looks: black like the notch, or Liquid Glass, dark or light.
+    @Published var appearance = Appearance(rawValue: UserDefaults.standard.string(forKey: "appearance") ?? "") ?? .black {
+        didSet { UserDefaults.standard.set(appearance.rawValue, forKey: "appearance") }
+    }
+
     /// Bumped when a file lands on the notch, for the swallow animation.
     @Published var gulps = 0
 

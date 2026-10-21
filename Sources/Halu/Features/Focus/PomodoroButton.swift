@@ -27,9 +27,7 @@ struct PomodoroButton: View {
                     }
                 }
                 .frame(width: 15, height: 15)
-                .frame(width: 24, height: 22)
-                .background(Capsule().fill(hovering ? Theme.card : .clear))
-                .contentShape(Capsule())
+                .headerButton(active: false, hovering: hovering)
             }
             .buttonStyle(.plain)
             .help(help(at: context.date))

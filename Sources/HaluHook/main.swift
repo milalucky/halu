@@ -88,9 +88,10 @@ case "UserPromptSubmit":
     session.status = .working
     session.message = nil
     session.turnStartedAt = now
-    if session.title.isEmpty, let prompt = payload["prompt"] as? String {
-        let line = prompt.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespaces)
-        session.title = String(line.prefix(90))
+    // The first real words become the title (a title that's only app markup is replaced).
+    if session.title.isEmpty || session.title.hasPrefix("<"), let prompt = payload["prompt"] as? String {
+        let line = ClaudeSession.cleanPrompt(prompt)
+        if !line.isEmpty { session.title = String(line.prefix(90)) }
     }
 case "PreToolUse":
     applyPlan()

@@ -75,9 +75,7 @@ struct ChatButton: View {
             Image(systemName: on ? "bubble.left.and.text.bubble.right.fill" : "bubble.left.and.text.bubble.right")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(on ? Theme.primary : (hovering ? Theme.secondary : Theme.tertiary))
-                .frame(width: 24, height: 22)
-                .background(Capsule().fill(on ? Color.white.opacity(0.12) : (hovering ? Theme.card : .clear)))
-                .contentShape(Capsule())
+                .headerButton(active: on, hovering: hovering)
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }

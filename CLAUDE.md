@@ -53,6 +53,8 @@ Answering Claude from the notch: halu-hook writes PermissionRequest / AskUserQue
 
 Header: left = Halu, tab title (truncates), weather pill (click opens the hidden Weather tab: hourly + 7-day forecast, Apple-Weather look; WeatherKit would need a paid developer account, so data is Open-Meteo) and the time; right = Claude usage, speed, Chat, Pomodoro, VPN, Keep Awake. The live line continues through the notch's top flares to the screen edge. Settings lets you reorder tabs (drag or arrows; AppModel.order, "tabOrder").
 
+Appearance (Settings): Black (default, melts into the notch), Dark Glass, Light Glass — glass modes draw the open panel with Liquid Glass (macOS 26 glassEffect, material fallback) and keep a black band behind the header; the header is always dark, the body follows the mode. Theme.primary/secondary/tertiary/card/hairline are adaptive (dark/light); use Theme.onPrimary for text on a primary fill. Header buttons share `.headerButton(active:tint:hovering:)` (26 pt circles). Claude session titles are cleaned of app markup (`ClaudeSession.cleanPrompt`).
+
 Tabs are configurable in Settings (gear): all on by default; a disabled tab hides from the sidebar, pauses its store's background work (`isActive`), and drops its notch indicators.
 
 ## Roadmap

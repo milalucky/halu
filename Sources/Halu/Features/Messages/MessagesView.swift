@@ -79,7 +79,7 @@ private struct FilterChip: View {
                 Text(title)
             }
                 .font(Theme.caption(11.5, weight: .semibold))
-                .foregroundStyle(selected ? Color.black.opacity(0.85) : Theme.secondary)
+                .foregroundStyle(selected ? Theme.onPrimary : Theme.secondary)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
                 .background(Capsule().fill(selected ? Theme.primary : Theme.card))
