@@ -78,6 +78,7 @@ struct ExpandedView: View {
                     case .translate: TranslateView(store: services.translate, speech: services.speech)
                     case .accounts: AccountsView(store: services.accounts)
                     case .notes: NotesView(store: services.notes)
+                    case .media: MediaView(store: services.media)
                     }
                 }
                 .padding(.leading, 18)

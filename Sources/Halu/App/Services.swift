@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 enum Tab: String, CaseIterable, Identifiable {
-    case tasks, calendar, claude, shelf, clipboard, translate, accounts, notes
+    case tasks, calendar, claude, shelf, clipboard, translate, accounts, notes, media
 
     var id: String { rawValue }
 
@@ -16,6 +16,7 @@ enum Tab: String, CaseIterable, Identifiable {
         case .translate: "Translate"
         case .accounts: "Accounts"
         case .notes: "Notes"
+        case .media: "Media"
         }
     }
 
@@ -29,6 +30,7 @@ enum Tab: String, CaseIterable, Identifiable {
         case .translate: "character.bubble"
         case .accounts: "key.horizontal"
         case .notes: "note.text"
+        case .media: "play.circle"
         }
     }
 }
@@ -59,6 +61,7 @@ final class Services {
     let translate = TranslateStore()
     let accounts = AccountStore()
     let notes = NotesStore()
+    let media = MediaStore()
     let speech = SpeechInput()
     let awake = AwakeController()
 
@@ -78,5 +81,6 @@ final class Services {
         shelf.start()
         clipboard.start()
         accounts.start()
+        media.start()
     }
 }

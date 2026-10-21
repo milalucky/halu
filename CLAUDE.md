@@ -37,5 +37,5 @@ Next, after Media:
 - Keep Awake button (`caffeinate`) — one tap, animated. Done.
 - More quick-action buttons next to Keep Awake (one-tap commands). Ideas so far: VPN on/off. More to be collected with the user.
 - Notes tab = Apple Notes (all notes, search; plain-text notes editable in Halu, rich notes read-only with "Open in Notes"; new notes go to the Notes folder).
-- Media tab: Now Playing through a helper dylib loaded into /usr/bin/perl (same technique as Cyclop, own implementation); play/pause/seek/skip for any source.
+- Media tab: Music and Spotify via AppleScript; any other source via system media keys (Accessibility). The perl-hosted MediaRemote helper (Cyclop's approach) was rejected as a security bypass — don't reintroduce it.
 - The animated Halu mark spins only where work is in progress (Claude tab, running tasks), never constantly in the main panel.
