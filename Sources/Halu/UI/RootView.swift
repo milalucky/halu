@@ -79,10 +79,12 @@ struct ExpandedView: View {
                     case .tasks: TasksView(store: services.tasks, speech: services.speech)
                     case .calendar: CalendarView(store: services.calendar)
                     case .claude: ClaudeView(store: services.claude)
+                    case .chat: ChatView(store: services.chat)
                     case .shelf: ShelfView(store: services.shelf)
                     case .clipboard: ClipboardView(store: services.clipboard)
                     case .translate: TranslateView(store: services.translate, speech: services.speech)
                     case .compare: CompareView(store: services.compare)
+                    case .tools: ToolsView(store: services.tools)
                     case .accounts: AccountsView(store: services.accounts)
                     case .notes: NotesView(store: services.notes)
                     case .media: MediaView(store: services.media)
@@ -187,14 +189,20 @@ struct Sidebar: View {
 
     var body: some View {
         VStack(spacing: 1) {
-            ForEach(tabs) { tab in
-                TabButton(tab: tab, selected: model.tab == tab,
-                          dot: (tab == .claude && !claude.attention.isEmpty) || (tab == .messages && messages.unseen > 0),
-                          selection: selection) {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { model.tab = tab }
+            // Many tabs: slightly shorter buttons, and the list scrolls if it still doesn't fit.
+            ScrollView(.vertical) {
+                VStack(spacing: 1) {
+                    ForEach(tabs) { tab in
+                        TabButton(tab: tab, selected: model.tab == tab, height: tabs.count > 11 ? 26 : 30,
+                                  dot: (tab == .claude && !claude.attention.isEmpty) || (tab == .messages && messages.unseen > 0),
+                                  selection: selection) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { model.tab = tab }
+                        }
+                    }
                 }
             }
-            Spacer(minLength: 0)
+            .scrollIndicators(.never)
+            Spacer(minLength: 4)
             TabButton(tab: .settings, selected: model.tab == .settings, selection: selection) {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { model.tab = .settings }
             }
@@ -209,6 +217,7 @@ struct Sidebar: View {
 struct TabButton: View {
     let tab: Tab
     let selected: Bool
+    var height: CGFloat = 30
     var dot = false
     let selection: Namespace.ID
     let action: () -> Void
@@ -229,7 +238,7 @@ struct TabButton: View {
                     .font(.system(size: 14, weight: selected ? .semibold : .regular))
                     .foregroundStyle(selected ? Theme.primary : (hovering ? Theme.secondary : Theme.tertiary))
             }
-            .frame(width: 38, height: 30)
+            .frame(width: 38, height: height)
             .overlay(alignment: .topTrailing) {
                 if dot {
                     Circle().fill(Theme.orange).frame(width: 6, height: 6).offset(x: -6, y: 6)

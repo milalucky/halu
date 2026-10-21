@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 enum Tab: String, CaseIterable, Identifiable {
-    case tasks, calendar, claude, jira, messages, shelf, clipboard, translate, compare, accounts, notes, media, settings
+    case tasks, calendar, claude, chat, jira, messages, shelf, clipboard, translate, compare, tools, accounts, notes, media, settings
 
     var id: String { rawValue }
 
@@ -11,10 +11,12 @@ enum Tab: String, CaseIterable, Identifiable {
         case .tasks: "Tasks"
         case .calendar: "Calendar"
         case .claude: "Claude"
+        case .chat: "Chat"
         case .shelf: "Shelf"
         case .clipboard: "Clipboard"
         case .translate: "Translate"
         case .compare: "Compare"
+        case .tools: "Tools"
         case .accounts: "Accounts"
         case .notes: "Notes"
         case .media: "Media"
@@ -29,10 +31,12 @@ enum Tab: String, CaseIterable, Identifiable {
         case .tasks: "checklist"
         case .calendar: "calendar"
         case .claude: "sparkle"
+        case .chat: "bubble.left.circle"
         case .shelf: "tray.full"
         case .clipboard: "doc.on.clipboard"
         case .translate: "character.bubble"
         case .compare: "arrow.left.arrow.right.square"
+        case .tools: "wrench.and.screwdriver"
         case .accounts: "key.horizontal"
         case .notes: "note.text"
         case .media: "play.circle"
@@ -97,6 +101,8 @@ final class Services {
     let speech = SpeechInput()
     let awake = AwakeController()
     let compare = CompareStore()
+    let chat = ChatStore()
+    let tools = ToolsStore()
     let vpn = VPNController()
     let speed = NetworkSpeed()
 
