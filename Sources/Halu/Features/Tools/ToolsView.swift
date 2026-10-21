@@ -3,21 +3,60 @@ import SwiftUI
 struct ToolsView: View {
     @ObservedObject var store: ToolsStore
     let compare: CompareStore
+    @ObservedObject var screen: ScreenTools
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Picker("", selection: $store.mode) {
-                ForEach(ToolsStore.Mode.allCases) { Text($0.rawValue).tag($0) }
+            HStack(spacing: 8) {
+                Picker("", selection: $store.mode) {
+                    ForEach(ToolsStore.Mode.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+                Spacer()
+                // Screen utilities: one click each.
+                ToolButton(icon: "eyedropper", title: screen.hex ?? "Color", swatch: screen.color.map(Color.init(nsColor:)),
+                           help: "Pick a colour anywhere on screen; its hex is copied", action: screen.pickColor)
+                ToolButton(icon: "ruler", title: "Ruler", help: screen.lastMeasure.map { "Last: \($0)" } ?? "Measure anything on screen in pixels",
+                           action: screen.showRuler)
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .fixedSize()
             switch store.mode {
             case .generate: GenerateView(store: store)
             case .convert: ConvertView(store: store)
             case .compare: CompareView(store: compare)
             }
         }
+    }
+}
+
+private struct ToolButton: View {
+    let icon: String
+    let title: String
+    var swatch: Color?
+    let help: String
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                if let swatch {
+                    RoundedRectangle(cornerRadius: 3).fill(swatch).frame(width: 11, height: 11)
+                        .overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(Color.white.opacity(0.3)))
+                } else {
+                    Image(systemName: icon).font(.system(size: 10.5, weight: .semibold))
+                }
+                Text(title).font(Theme.caption(11.5, weight: .semibold)).monospaced(swatch != nil)
+            }
+            .foregroundStyle(hovering ? Theme.primary : Theme.secondary)
+            .padding(.horizontal, 9)
+            .frame(height: 24)
+            .background(Capsule().fill(hovering ? Theme.cardHover : Theme.card))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help(help)
     }
 }
 

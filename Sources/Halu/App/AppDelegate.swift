@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import SwiftUI
 import ServiceManagement
 
@@ -14,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         services.openWindow = { [weak self] in self?.showWindow() }
         controller = NotchController(services: services)
         setupStatusItem()
+        setupHotKeys()
         setupEditMenu()
     }
 
@@ -70,6 +72,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func openPanel() { controller?.openOnPointerScreen() }
 
     @objc private func openWindowItem() { showWindow() }
+
+    /// ⌃⌥Space opens Halu; ⌃⌥T translates the text selected in any app.
+    private func setupHotKeys() {
+        HotKeys.shared.register(key: kVK_Space) { [weak self] in self?.controller?.openOnPointerScreen() }
+        HotKeys.shared.register(key: kVK_ANSI_T) { [weak self] in
+            Selection.copySelectedText { text in
+                guard let self else { return }
+                if let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    self.services.translate.input = text
+                }
+                self.controller?.openOnPointerScreen(tab: .translate)
+            }
+        }
+    }
 
     /// Halu as an ordinary window, for working in a tab for longer: it doesn't hide when the pointer leaves.
     private func showWindow() {

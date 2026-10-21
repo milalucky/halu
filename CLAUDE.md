@@ -47,6 +47,8 @@ Tasks have tags (#tag while typing, picker, filter; new tasks get the active fil
 
 The panel reopens on the last tab (hovering the notch mark doesn't jump to Messages/Claude). Clicking the Halu logo opens Halu as a normal resizable window (WindowRootView, same Sidebar + TabContent). Claude's sidebar icon is a monochrome burst (ClaudeMark). Header speed = busier of physical ports vs utun tunnels. The clipboard keeps everything, tokens included — the user chose that; don't filter.
 
+Live notch (LiveCenter / LiveView, Display.live): a meeting within 15 min (or started and not joined, up to 10 min) or the Pomodoro timer shows on the collapsed notch with a glow tracing the notch outline that shrinks with time; tapping joins the meeting / pauses the timer. Meeting reminders at 5 min, 1 min, start, +2 min until joined (Join anywhere marks it joined). Pomodoro button in the header (right-click for lengths). Tools has a colour picker (NSColorSampler) and a pixel ruler overlay. Global shortcuts (Carbon hot keys): ⌃⌥Space opens Halu, ⌃⌥T translates the selected text (sends ⌘C, needs Accessibility, restores the clipboard). The header clock shows time only; the date is in its tooltip.
+
 Tabs are configurable in Settings (gear): all on by default; a disabled tab hides from the sidebar, pauses its store's background work (`isActive`), and drops its notch indicators.
 
 ## Roadmap

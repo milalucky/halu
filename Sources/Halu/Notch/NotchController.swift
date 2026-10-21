@@ -43,11 +43,11 @@ final class NotchController {
         self.timer = timer
     }
 
-    func openOnPointerScreen() {
+    func openOnPointerScreen(tab: Tab? = nil) {
         let point = NSEvent.mouseLocation
         let panel = panels.values.first { $0.state.geometry.screenFrame.contains(point) } ?? panels.values.first
         guard let panel else { return }
-        expand(panel, tab: nil)
+        expand(panel, tab: tab)
         panel.sticky = true
     }
 

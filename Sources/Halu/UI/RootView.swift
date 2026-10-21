@@ -83,7 +83,7 @@ struct TabContent: View {
         case .chat: ChatView(store: services.chat)
         case .clipboard: ClipboardTab(clipboard: services.clipboard, shelf: services.shelf)
         case .translate: TranslateView(store: services.translate, speech: services.speech)
-        case .tools: ToolsView(store: services.tools, compare: services.compare)
+        case .tools: ToolsView(store: services.tools, compare: services.compare, screen: services.screenTools)
         case .accounts: AccountsView(store: services.accounts)
         case .notes: NotesView(store: services.notes)
         case .media: MediaView(store: services.media)

@@ -105,6 +105,7 @@ final class Services {
     let compare = CompareStore()
     let chat = ChatStore()
     let tools = ToolsStore()
+    let screenTools = ScreenTools()
     let gitlab = GitLabStore()
     /// Opens Halu as a normal window that stays open; set by the app delegate.
     var openWindow: () -> Void = {}
