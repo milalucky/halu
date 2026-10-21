@@ -1,19 +1,54 @@
 import SwiftUI
 
-/// Settings → Integrations: where API tokens are entered. Tokens go to the Keychain.
+/// Settings: which tabs show, and the integrations with their API tokens (kept in the Keychain).
 struct IntegrationsView: View {
+    @ObservedObject var model: AppModel
     @ObservedObject var jira: JiraStore
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
+                SectionHeader(title: "Tabs", detail: "Turned-off tabs disappear and stop working in the background")
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                    ForEach(AppModel.configurable) { tab in
+                        TabToggle(tab: tab, model: model)
+                    }
+                }
                 SectionHeader(title: "Integrations", detail: "Tokens are stored in your Keychain")
+                    .padding(.top, 8)
                 JiraCard(store: jira)
                 ComingSoonCard(icon: "number", name: "Slack", detail: "New messages in the Messages tab")
                 ComingSoonCard(icon: "paperplane", name: "Telegram", detail: "New messages in the Messages tab")
             }
         }
         .scrollIndicators(.never)
+    }
+}
+
+private struct TabToggle: View {
+    let tab: Tab
+    @ObservedObject var model: AppModel
+
+    var body: some View {
+        let enabled = model.isEnabled(tab)
+        HStack(spacing: 10) {
+            Image(systemName: tab.icon)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(enabled ? Theme.primary : Theme.tertiary)
+                .frame(width: 18)
+            Text(tab.title)
+                .font(Theme.body(12.5, weight: .medium))
+                .foregroundStyle(enabled ? Theme.primary : Theme.tertiary)
+            Spacer()
+            Toggle("", isOn: Binding(get: { enabled }, set: { model.setEnabled(tab, $0) }))
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .labelsHidden()
+                .tint(Theme.accent)
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 36)
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.card))
     }
 }
 

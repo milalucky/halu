@@ -19,6 +19,9 @@ struct Meeting: Identifiable, Equatable {
 /// shows up here without any extra sign-in.
 @MainActor
 final class CalendarStore: ObservableObject {
+    /// False while the tab is turned off in Settings: background work pauses.
+    var isActive: () -> Bool = { true }
+
     enum Access { case unknown, granted, denied }
 
     @Published private(set) var access: Access = .unknown
@@ -101,6 +104,7 @@ final class CalendarStore: ObservableObject {
     }
 
     private func checkReminders() {
+        guard isActive() else { return }
         let now = Date()
         for meeting in meetings where !meeting.isAllDay {
             let lead = meeting.start.timeIntervalSince(now)

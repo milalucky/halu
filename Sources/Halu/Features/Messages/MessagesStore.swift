@@ -20,6 +20,9 @@ struct IncomingMessage: Identifiable, Equatable {
 /// Access, because the notification database is protected.
 @MainActor
 final class MessagesStore: ObservableObject {
+    /// False while the tab is turned off in Settings: background work pauses.
+    var isActive: () -> Bool = { true }
+
     enum Access { case unknown, granted, needsFullDiskAccess, unreadable }
 
     @Published private(set) var access: Access = .unknown
@@ -96,6 +99,7 @@ final class MessagesStore: ObservableObject {
     }
 
     func reload() {
+        guard isActive() else { return }
         guard FileManager.default.isReadableFile(atPath: Self.databasePath) else {
             access = .needsFullDiskAccess
             return

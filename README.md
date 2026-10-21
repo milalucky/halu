@@ -25,6 +25,8 @@ Halu stays invisible until you point at the notch, then unfolds into a small pan
 - **Media.** Appears only while something plays: a YouTube tab, Yandex Music, any app. Shows which app is playing and its window title, with play/pause and skip working like the keyboard's media keys.
 - **Keep Awake.** One tap keeps your Mac from sleeping while long work runs, for an hour, three hours or until you turn it off.
 
+Every tab can be turned off in Settings (the gear); a turned-off tab disappears and stops its background work.
+
 On the roadmap: quick actions such as VPN, and an iPhone companion app with sync.
 
 ## Requirements

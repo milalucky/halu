@@ -22,6 +22,9 @@ struct ClaudeRow: Identifiable, Equatable {
 /// Watches the snapshots `halu-hook` writes and reports status changes.
 @MainActor
 final class ClaudeStore: ObservableObject {
+    /// False while the tab is turned off in Settings: background work pauses.
+    var isActive: () -> Bool = { true }
+
     @Published private(set) var rows: [ClaudeRow] = []
     @Published private(set) var hooksInstalled = HookInstaller.isInstalled
     @Published var installError: String?
@@ -105,6 +108,7 @@ final class ClaudeStore: ObservableObject {
     }
 
     func reload() {
+        guard isActive() else { return }
         let directory = HaluPaths.claudeSessions
         let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
         let decoder = HaluJSON.decoder()

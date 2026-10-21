@@ -34,6 +34,9 @@ struct JiraProject: Identifiable, Equatable, Codable {
 /// issues you've touched lately, and the status queue is any status you pick.
 @MainActor
 final class JiraStore: ObservableObject {
+    /// False while the tab is turned off in Settings: background work pauses.
+    var isActive: () -> Bool = { true }
+
     enum Mode: String, CaseIterable, Identifiable {
         /// My open issues.
         case mine = "Mine"
@@ -139,6 +142,7 @@ final class JiraStore: ObservableObject {
     // MARK: Issues
 
     func refresh() {
+        guard isActive() else { return }
         guard isConnected, let client else { return }
         if mode == .queue && statuses.isEmpty { loadStatuses() }
         guard let jql else {

@@ -17,6 +17,9 @@ struct Snippet: Codable, Identifiable, Equatable {
 /// password manager marks as concealed or transient is never recorded.
 @MainActor
 final class ClipboardStore: ObservableObject {
+    /// False while the tab is turned off in Settings: background work pauses.
+    var isActive: () -> Bool = { true }
+
     @Published private(set) var history: [ClipEntry]
     @Published private(set) var snippets: [Snippet]
     /// The snippet being written, kept here so it survives the panel closing.
@@ -95,6 +98,7 @@ final class ClipboardStore: ObservableObject {
     // MARK: Watching
 
     private func poll() {
+        guard isActive() else { return }
         let board = NSPasteboard.general
         guard board.changeCount != lastChange else { return }
         lastChange = board.changeCount

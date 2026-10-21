@@ -9,9 +9,12 @@ struct RootView: View {
     let services: Services
     let actions: PanelActions
 
+    private var claudeWaiting: Int { model.isEnabled(.claude) ? claude.attention.count : 0 }
+    private var unread: Int { model.isEnabled(.messages) ? messages.unseen : 0 }
+
     private var display: Display {
         Layout.display(expanded: state.isExpanded, hasNotice: notices.current != nil,
-                       attention: claude.attention.count + messages.unseen, hasNotch: state.geometry.hasNotch)
+                       attention: claudeWaiting + unread, hasNotch: state.geometry.hasNotch)
     }
 
     var body: some View {
@@ -49,8 +52,8 @@ struct RootView: View {
                     .transition(.opacity.animation(.easeOut(duration: 0.2)))
             }
         case .badge:
-            BadgeView(claudeWaiting: claude.attention.count, apps: messages.unseenApps,
-                      count: claude.attention.count + messages.unseen, messages: messages) {
+            BadgeView(claudeWaiting: claudeWaiting, apps: unread > 0 ? messages.unseenApps : [],
+                      count: claudeWaiting + unread, messages: messages) {
                 actions.open(services.attentionTab)
             }
                 .transition(.opacity)
@@ -85,7 +88,7 @@ struct ExpandedView: View {
                     case .media: MediaView(store: services.media)
                     case .messages: MessagesView(store: services.messages)
                     case .jira: JiraView(store: services.jira) { model.tab = .settings }
-                    case .settings: IntegrationsView(jira: services.jira)
+                    case .settings: IntegrationsView(model: model, jira: services.jira)
                     }
                 }
                 .padding(.leading, 18)
@@ -165,7 +168,10 @@ struct Sidebar: View {
 
     /// Media only shows up while something plays or sits paused.
     private var tabs: [Tab] {
-        Tab.allCases.filter { $0 != .settings && ($0 != .media || media.source != nil || model.tab == .media) }
+        Tab.allCases.filter { tab in
+            guard tab != .settings, model.isEnabled(tab) else { return false }
+            return tab != .media || media.source != nil || model.tab == .media
+        }
     }
 
     var body: some View {

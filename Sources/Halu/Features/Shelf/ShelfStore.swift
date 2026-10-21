@@ -23,6 +23,9 @@ struct ShelfItem: Codable, Identifiable, Equatable {
 /// system screenshot folder, and images copied to the clipboard, arrive on their own.
 @MainActor
 final class ShelfStore: ObservableObject {
+    /// False while the tab is turned off in Settings: background work pauses.
+    var isActive: () -> Bool = { true }
+
     @Published private(set) var items: [ShelfItem] = []
 
     let screenshotFolder: URL
@@ -126,6 +129,7 @@ final class ShelfStore: ObservableObject {
     }
 
     private func scanScreenshots() {
+        guard isActive() else { return }
         let keys: [URLResourceKey] = [.creationDateKey, .isRegularFileKey]
         guard let files = try? FileManager.default.contentsOfDirectory(at: screenshotFolder, includingPropertiesForKeys: keys,
                                                                        options: [.skipsHiddenFiles]) else { return }
@@ -150,6 +154,7 @@ final class ShelfStore: ObservableObject {
     }
 
     private func pollClipboard() {
+        guard isActive() else { return }
         let board = NSPasteboard.general
         guard board.changeCount != lastClipboardChange else { return }
         lastClipboardChange = board.changeCount

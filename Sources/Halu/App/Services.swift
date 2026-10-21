@@ -19,7 +19,7 @@ enum Tab: String, CaseIterable, Identifiable {
         case .media: "Media"
         case .jira: "Jira"
         case .messages: "Messages"
-        case .settings: "Integrations"
+        case .settings: "Settings"
         }
     }
 
@@ -47,8 +47,30 @@ final class AppModel: ObservableObject {
         didSet { UserDefaults.standard.set(tab.rawValue, forKey: "selectedTab") }
     }
 
+    /// Tabs turned off in Settings; everything is on by default.
+    @Published private(set) var disabledTabs: Set<Tab>
+
     init() {
         tab = UserDefaults.standard.string(forKey: "selectedTab").flatMap(Tab.init(rawValue:)) ?? .tasks
+        disabledTabs = Set((UserDefaults.standard.stringArray(forKey: "disabledTabs") ?? []).compactMap(Tab.init(rawValue:)))
+    }
+
+    /// Tabs that can be turned off (Settings itself can't).
+    static let configurable = Tab.allCases.filter { $0 != .settings }
+
+    func isEnabled(_ tab: Tab) -> Bool { !disabledTabs.contains(tab) }
+
+    func setEnabled(_ tab: Tab, _ enabled: Bool) {
+        guard tab != .settings else { return }
+        if enabled {
+            disabledTabs.remove(tab)
+        } else {
+            // Keep at least one tab.
+            guard Self.configurable.filter(isEnabled).count > 1 else { return }
+            disabledTabs.insert(tab)
+            if self.tab == tab { self.tab = Self.configurable.first(where: isEnabled) ?? .settings }
+        }
+        UserDefaults.standard.set(disabledTabs.map(\.rawValue), forKey: "disabledTabs")
     }
 }
 
@@ -74,15 +96,25 @@ final class Services {
     let awake = AwakeController()
 
     /// Something waiting for the user, shown on the collapsed notch: Claude first, then unread messages.
-    var attentionCount: Int { claude.attention.count + messages.unseen }
+    var claudeWaiting: Int { model.isEnabled(.claude) ? claude.attention.count : 0 }
+    var unreadMessages: Int { model.isEnabled(.messages) ? messages.unseen : 0 }
+    var attentionCount: Int { claudeWaiting + unreadMessages }
 
     var attentionTab: Tab? {
-        if !claude.attention.isEmpty { return .claude }
-        if messages.unseen > 0 { return .messages }
+        if claudeWaiting > 0 { return .claude }
+        if unreadMessages > 0 { return .messages }
         return nil
     }
 
     func start() {
+        let model = model
+        calendar.isActive = { model.isEnabled(.calendar) }
+        claude.isActive = { model.isEnabled(.claude) }
+        clipboard.isActive = { model.isEnabled(.clipboard) }
+        jira.isActive = { model.isEnabled(.jira) }
+        media.isActive = { model.isEnabled(.media) }
+        messages.isActive = { model.isEnabled(.messages) }
+        shelf.isActive = { model.isEnabled(.shelf) }
         calendar.onReminder = { [notices] meeting, startsNow in
             notices.post(.meeting(meeting, startsNow: startsNow))
         }

@@ -18,6 +18,9 @@ struct MediaSource: Equatable {
 /// Window titles and media keys both need Accessibility access.
 @MainActor
 final class MediaStore: ObservableObject {
+    /// False while the tab is turned off in Settings: background work pauses.
+    var isActive: () -> Bool = { true }
+
     @Published private(set) var source: MediaSource?
     @Published private(set) var canControl = AXIsProcessTrusted()
 
@@ -35,6 +38,7 @@ final class MediaStore: ObservableObject {
     }
 
     func refresh() {
+        guard isActive() else { return }
         canControl = AXIsProcessTrusted()
         let now = Date()
         if let playing = Self.appPlayingAudio() {
