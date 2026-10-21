@@ -70,7 +70,7 @@ struct ExpandedView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HeaderBar(model: model, awake: services.awake, vpn: services.vpn, claude: services.claude, geometry: geometry)
+            HeaderBar(model: model, awake: services.awake, vpn: services.vpn, speed: services.speed, claude: services.claude, geometry: geometry)
             HStack(spacing: 0) {
                 Sidebar(model: model, claude: services.claude, media: services.media, messages: services.messages)
                 Rectangle().fill(Theme.hairline).frame(width: 1).padding(.vertical, 6)
@@ -124,6 +124,7 @@ struct HeaderBar: View {
     @ObservedObject var model: AppModel
     @ObservedObject var awake: AwakeController
     let vpn: VPNController
+    let speed: NetworkSpeed
     @ObservedObject var claude: ClaudeStore
     let geometry: NotchGeometry
 
@@ -147,6 +148,7 @@ struct HeaderBar: View {
             Spacer(minLength: 0)
 
             HStack(spacing: 10) {
+                SpeedLabel(speed: speed)
                 VPNButton(vpn: vpn)
                 AwakeButton(awake: awake)
                 TimelineView(.periodic(from: .now, by: 15)) { context in

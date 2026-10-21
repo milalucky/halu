@@ -18,24 +18,31 @@ struct TasksView: View {
     private var list: some View {
         let open = store.open
         return VStack(alignment: .leading, spacing: 10) {
-            SectionHeader(title: "To do", detail: open.isEmpty ? nil : "\(open.count) left")
-            InputField(placeholder: "Add a task or dictate it", text: $store.draft, speech: speech) {
+            HStack {
+                SectionHeader(title: "To do", detail: open.isEmpty ? nil : "\(open.count) left")
+                if !store.tags.isEmpty { TagFilterMenu(store: store) }
+            }
+            InputField(placeholder: "Add a task or dictate it · #DTM adds a tag", text: $store.draft, speech: speech) {
                 speech.stop()
                 withAnimation(.spring(response: 0.3)) { store.add(store.draft) }
                 store.draft = ""
+            }
+            if !store.tags.isEmpty {
+                DraftTags(store: store)
             }
             if let problem = speech.problem {
                 Text(problem).font(Theme.caption(11, weight: .regular)).foregroundStyle(Theme.orange)
             }
 
             if open.isEmpty {
-                EmptyState(icon: "checkmark.seal", title: "All clear",
-                           subtitle: "Write down what you shouldn't forget today.")
+                EmptyState(icon: "checkmark.seal", title: store.tagFilter.map { "Nothing for \($0)" } ?? "All clear",
+                           subtitle: "Write down what you shouldn't forget today. Start with #DTM, #DS… to tag it.")
             } else {
                 ScrollView {
                     LazyVStack(spacing: 1) {
                         ForEach(open) { task in
-                            TaskRow(task: task, checked: checking.contains(task.id),
+                            TaskRow(task: task, allTags: store.tags, checked: checking.contains(task.id),
+                                    onToggleTag: { store.toggle($0, on: task.id) },
                                     onCheck: { check(task) },
                                     onRename: { store.rename(task.id, to: $0) },
                                     onDelete: { withAnimation { store.delete(task.id) } })
@@ -73,9 +80,116 @@ struct TasksView: View {
     }
 }
 
+/// A quiet colour per tag, the same every time.
+enum TagColor {
+    private static let palette = [Theme.accent, Theme.blue, Theme.green, Theme.orange, Theme.red,
+                                  Color(red: 0.95, green: 0.55, blue: 0.85), Color(red: 0.4, green: 0.85, blue: 0.85)]
+
+    static func of(_ tag: String) -> Color {
+        let sum = tag.lowercased().unicodeScalars.reduce(0) { $0 &+ Int($1.value) }
+        return palette[sum % palette.count]
+    }
+}
+
+struct TagChip: View {
+    let tag: String
+    var selected = true
+
+    var body: some View {
+        Text(tag)
+            .font(Theme.caption(10.5, weight: .semibold))
+            .foregroundStyle(selected ? TagColor.of(tag) : Theme.tertiary)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
+            .background(Capsule().fill(TagColor.of(tag).opacity(selected ? 0.16 : 0.05)))
+            .lineLimit(1)
+            .fixedSize()
+    }
+}
+
+/// Show all tasks or one tag's.
+private struct TagFilterMenu: View {
+    @ObservedObject var store: TaskStore
+
+    var body: some View {
+        Menu {
+            Button {
+                store.tagFilter = nil
+            } label: {
+                if store.tagFilter == nil { Label("All tasks", systemImage: "checkmark") } else { Text("All tasks") }
+            }
+            Divider()
+            ForEach(store.tags, id: \.self) { tag in
+                Button {
+                    store.tagFilter = tag
+                } label: {
+                    let title = "\(tag)  \(store.openCount(tag))"
+                    if store.tagFilter == tag { Label(title, systemImage: "checkmark") } else { Text(title) }
+                }
+            }
+            Divider()
+            Menu("Remove a tag") {
+                ForEach(store.tags, id: \.self) { tag in Button(tag) { store.forget(tag) } }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                if let filter = store.tagFilter { Circle().fill(TagColor.of(filter)).frame(width: 6, height: 6) }
+                Text(store.tagFilter ?? "All tags")
+                Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
+            }
+            .font(Theme.caption(11.5, weight: .semibold))
+            .foregroundStyle(store.tagFilter == nil ? Theme.tertiary : Theme.primary)
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Show tasks with one tag; new tasks get it too")
+    }
+}
+
+/// Tags for the task being written: picked ones, and a menu to add more.
+private struct DraftTags: View {
+    @ObservedObject var store: TaskStore
+
+    var body: some View {
+        HStack(spacing: 5) {
+            if let filter = store.tagFilter { TagChip(tag: filter) }
+            ForEach(store.draftTags.filter { $0 != store.tagFilter }, id: \.self) { tag in
+                Button { store.toggleDraftTag(tag) } label: { TagChip(tag: tag) }
+                    .buttonStyle(.plain)
+                    .help("Remove")
+            }
+            Menu {
+                ForEach(store.tags.filter { $0 != store.tagFilter }, id: \.self) { tag in
+                    Button {
+                        store.toggleDraftTag(tag)
+                    } label: {
+                        if store.draftTags.contains(tag) { Label(tag, systemImage: "checkmark") } else { Text(tag) }
+                    }
+                }
+            } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: "tag").font(.system(size: 9, weight: .bold))
+                    Text("Tag")
+                }
+                .font(Theme.caption(10.5, weight: .semibold))
+                .foregroundStyle(Theme.tertiary)
+            }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            Spacer(minLength: 0)
+        }
+    }
+}
+
 private struct TaskRow: View {
     let task: TaskItem
+    let allTags: [String]
     let checked: Bool
+    let onToggleTag: (String) -> Void
     let onCheck: () -> Void
     let onRename: (String) -> Void
     let onDelete: () -> Void
@@ -120,6 +234,9 @@ private struct TaskRow: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .contentShape(Rectangle())
                         .onTapGesture(count: 2) { startEditing() }
+                    HStack(spacing: 4) {
+                        ForEach(task.tags, id: \.self) { TagChip(tag: $0) }
+                    }
                 }
 
                 if hovering && !editing {
@@ -130,6 +247,15 @@ private struct TaskRow: View {
         }
         .contextMenu {
             Button("Edit", action: startEditing)
+            if !allTags.isEmpty {
+                Menu("Tags") {
+                    ForEach(allTags, id: \.self) { tag in
+                        Button { onToggleTag(tag) } label: {
+                            if task.tags.contains(tag) { Label(tag, systemImage: "checkmark") } else { Text(tag) }
+                        }
+                    }
+                }
+            }
             Button("Delete", role: .destructive, action: onDelete)
         }
     }
@@ -192,6 +318,7 @@ private struct DoneTasksView: View {
                                             .foregroundStyle(Theme.secondary)
                                             .lineLimit(2)
                                             .frame(maxWidth: .infinity, alignment: .leading)
+                                        ForEach(task.tags, id: \.self) { TagChip(tag: $0, selected: false) }
                                         if hovering {
                                             IconButton(icon: "arrow.uturn.backward", help: "Move back to To do") {
                                                 withAnimation { store.restore(task.id) }

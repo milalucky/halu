@@ -98,6 +98,7 @@ final class Services {
     let awake = AwakeController()
     let compare = CompareStore()
     let vpn = VPNController()
+    let speed = NetworkSpeed()
 
     /// Something waiting for the user, shown on the collapsed notch: Claude first, then unread messages.
     var claudeWaiting: Int { model.isEnabled(.claude) ? claude.attention.count : 0 }

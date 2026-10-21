@@ -29,7 +29,7 @@ enum Fmt {
 
     static let time = formatter("HH:mm")
     static let day = formatter("EEE, MMM d")
-    static let headerDate = formatter("EEE d MMM")
+    static let headerDate = formatter("EEE d")
 
     static func ago(_ date: Date, now: Date = .now) -> String {
         let seconds = Int(now.timeIntervalSince(date))
