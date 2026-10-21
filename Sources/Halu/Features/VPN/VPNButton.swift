@@ -13,21 +13,14 @@ struct VPNButton: View {
             Menu {
                 menu(active)
             } label: {
-                HStack(spacing: 5) {
-                    Image(systemName: vpn.isOn ? "lock.shield.fill" : "lock.shield")
-                        .font(.system(size: 12, weight: .semibold))
-                        .symbolEffect(.pulse, options: .repeating, isActive: vpn.isConnecting)
-                    if let active {
-                        Text(short(active.name))
-                            .font(Theme.caption(11, weight: .semibold))
-                            .lineLimit(1)
-                    }
-                }
-                .foregroundStyle(tint)
-                .padding(.horizontal, active == nil ? 6 : 9)
-                .frame(height: 22)
-                .background(Capsule().fill(active != nil ? tint.opacity(0.15) : (hovering ? Theme.card : .clear)))
-                .contentShape(Capsule())
+                // Icon only: the header wing is narrow. The server's name is in the tooltip and the menu.
+                Image(systemName: vpn.isOn ? "lock.shield.fill" : "lock.shield")
+                    .font(.system(size: 12, weight: .semibold))
+                    .symbolEffect(.pulse, options: .repeating, isActive: vpn.isConnecting)
+                    .foregroundStyle(tint)
+                    .frame(width: 26, height: 22)
+                    .background(Capsule().fill(active != nil ? tint.opacity(0.15) : (hovering ? Theme.card : .clear)))
+                    .contentShape(Capsule())
             }
             .menuStyle(.button)
             .buttonStyle(.plain)
@@ -80,12 +73,5 @@ struct VPNButton: View {
     private func help(_ active: VPNController.Connection?) -> String {
         if let active { return "\(active.name) is on · click to switch or turn off" }
         return "VPN · choose a server"
-    }
-
-    /// "🇰🇿 KZ - Pavlodar" → "KZ - Pavlodar": the header has little room.
-    private func short(_ name: String) -> String {
-        let trimmed = name.unicodeScalars.drop { $0.properties.isEmojiPresentation || (0x1F1E6...0x1F1FF).contains($0.value) || $0 == " " }
-        let text = String(String.UnicodeScalarView(trimmed))
-        return text.count > 16 ? String(text.prefix(15)) + "…" : text
     }
 }

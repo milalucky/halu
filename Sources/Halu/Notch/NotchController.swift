@@ -158,7 +158,8 @@ final class NotchController {
                 let triggerWidth = current == .badge ? Layout.size(.badge, g).width : nil
                 if g.isInTrigger(point, width: triggerWidth) {
                     if isFileDrag {
-                        expand(panel, tab: .shelf)
+                        // Files dragged to the notch go to the Shelf, unless Compare is open and waiting for them.
+                        expand(panel, tab: services.model.tab == .compare ? nil : .shelf)
                     } else if buttons == 0 {
                         let since = panel.hoverSince ?? now
                         panel.hoverSince = since

@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 enum Tab: String, CaseIterable, Identifiable {
-    case tasks, calendar, claude, jira, messages, shelf, clipboard, translate, accounts, notes, media, settings
+    case tasks, calendar, claude, jira, messages, shelf, clipboard, translate, compare, accounts, notes, media, settings
 
     var id: String { rawValue }
 
@@ -14,6 +14,7 @@ enum Tab: String, CaseIterable, Identifiable {
         case .shelf: "Shelf"
         case .clipboard: "Clipboard"
         case .translate: "Translate"
+        case .compare: "Compare"
         case .accounts: "Accounts"
         case .notes: "Notes"
         case .media: "Media"
@@ -31,6 +32,7 @@ enum Tab: String, CaseIterable, Identifiable {
         case .shelf: "tray.full"
         case .clipboard: "doc.on.clipboard"
         case .translate: "character.bubble"
+        case .compare: "arrow.left.arrow.right.square"
         case .accounts: "key.horizontal"
         case .notes: "note.text"
         case .media: "play.circle"
@@ -94,6 +96,7 @@ final class Services {
     let messages = MessagesStore()
     let speech = SpeechInput()
     let awake = AwakeController()
+    let compare = CompareStore()
     let vpn = VPNController()
 
     /// Something waiting for the user, shown on the collapsed notch: Claude first, then unread messages.
@@ -135,5 +138,6 @@ final class Services {
         jira.start()
         messages.start()
         vpn.start()
+        awake.restore()
     }
 }

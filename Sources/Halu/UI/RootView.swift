@@ -82,6 +82,7 @@ struct ExpandedView: View {
                     case .shelf: ShelfView(store: services.shelf)
                     case .clipboard: ClipboardView(store: services.clipboard)
                     case .translate: TranslateView(store: services.translate, speech: services.speech)
+                    case .compare: CompareView(store: services.compare)
                     case .accounts: AccountsView(store: services.accounts)
                     case .notes: NotesView(store: services.notes)
                     case .media: MediaView(store: services.media)
@@ -98,6 +99,11 @@ struct ExpandedView: View {
             }
         }
         .onDrop(of: [.fileURL], isTargeted: $dropTargeted) { providers in
+            // On Compare a drop anywhere fills the empty side; elsewhere files go to the Shelf.
+            if model.tab == .compare {
+                services.compare.load(providers: providers)
+                return true
+            }
             model.tab = .shelf
             services.shelf.add(providers: providers)
             return true
@@ -150,6 +156,8 @@ struct HeaderBar: View {
                     }
                     .font(Theme.caption(12, weight: .medium))
                     .foregroundStyle(Theme.secondary)
+                    .lineLimit(1)
+                    .fixedSize()
                 }
             }
             .frame(width: wing, alignment: .trailing)
@@ -249,29 +257,19 @@ struct AwakeButton: View {
 
     var body: some View {
         Button(action: awake.toggle) {
-            HStack(spacing: 5) {
-                Image(systemName: awake.isOn ? "cup.and.heat.waves.fill" : "cup.and.saucer")
-                    .font(.system(size: 12, weight: .semibold))
-                    .symbolEffect(.variableColor.iterative.reversing, options: .repeating, isActive: awake.isOn)
-                    .symbolEffect(.bounce, value: awake.isOn)
-                if awake.isOn {
-                    TimelineView(.periodic(from: .now, by: 30)) { context in
-                        Text(label(now: context.date))
-                            .font(Theme.caption(11, weight: .semibold))
-                            .monospacedDigit()
-                    }
-                    .transition(.opacity.combined(with: .move(edge: .trailing)))
-                }
-            }
+            // Icon only, the steam shows it's on; the time left is in the tooltip.
+            Image(systemName: awake.isOn ? "cup.and.heat.waves.fill" : "cup.and.saucer")
+                .font(.system(size: 12, weight: .semibold))
+                .symbolEffect(.variableColor.iterative.reversing, options: .repeating, isActive: awake.isOn)
+                .symbolEffect(.bounce, value: awake.isOn)
             .foregroundStyle(awake.isOn ? Theme.orange : (hovering ? Theme.secondary : Theme.tertiary))
-            .padding(.horizontal, awake.isOn ? 9 : 6)
-            .frame(height: 22)
+            .frame(width: 26, height: 22)
             .background(Capsule().fill(awake.isOn ? Theme.orange.opacity(0.15) : (hovering ? Theme.card : .clear)))
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .help(awake.isOn ? "Mac stays awake · click to let it sleep" : "Keep Mac awake")
+        .help(awake.isOn ? "Mac and display stay awake (\(label(now: .now))) · click to let it sleep" : "Keep Mac awake")
         .contextMenu {
             Button("Keep awake for 1 hour") { awake.start(for: 3600) }
             Button("Keep awake for 3 hours") { awake.start(for: 3 * 3600) }
@@ -285,7 +283,7 @@ struct AwakeButton: View {
     }
 
     private func label(now: Date) -> String {
-        guard let until = awake.until else { return "Awake" }
+        guard let until = awake.until else { return "until turned off" }
         let minutes = max(0, Int(until.timeIntervalSince(now) / 60))
         return minutes >= 60 ? "\(minutes / 60)h \(minutes % 60)m" : "\(minutes)m"
     }

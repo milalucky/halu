@@ -35,6 +35,10 @@ Collapsed notch indicator: just the Halu mark in orange with a soft glow, no bac
 Secrets live in ONE Keychain item (`com.milana.halu.secrets`), read once per launch: every local rebuild changes the code identity, so macOS asks once per item.
 13. Quick actions next to Keep Awake. VPN switcher done (Features/VPN): click lists every server grouped by app, picking one switches to it. Sources: `scutil --nc` (Outline and other system VPNs), Pritunl via its own `pritunl-client` CLI (system profiles only: GUI-only profiles keep their keys encrypted by the Pritunl app — never decrypt them), AmneziaVPN has no outside control (Open app).
 
+14. Compare — two inputs (drop, paste, open): text/Markdown/any text file line diff (Swift `difference(from:)`, Myers, with changed words lit), JSON and PDF form fields by path (key order and formatting ignored; `true` ≠ `1`), PDF text via PDFKit, Word/RTF/ODT/HTML via NSAttributedString, images pixel by pixel. No dependencies, nothing leaves the Mac. A file drop on the panel or notch fills Compare while it's open.
+
+Header right wing is narrow: VPN and Keep Awake are icon-only (details in tooltips). Keep Awake runs `caffeinate -dims` and is restored after Halu restarts.
+
 Tabs are configurable in Settings (gear): all on by default; a disabled tab hides from the sidebar, pauses its store's background work (`isActive`), and drops its notch indicators.
 
 ## Roadmap
