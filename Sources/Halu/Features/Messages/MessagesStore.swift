@@ -61,6 +61,15 @@ final class MessagesStore: ObservableObject {
 
     func isNew(_ message: IncomingMessage) -> Bool { message.date > lastSeen }
 
+    /// Apps with unread messages, most recent first; drives the icons on the collapsed notch.
+    var unseenApps: [String] {
+        var apps: [String] = []
+        for message in messages where message.date > lastSeen && !apps.contains(message.appID) {
+            apps.append(message.appID)
+        }
+        return apps
+    }
+
     func start() {
         let timer = Timer(timeInterval: 5, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.reload() }

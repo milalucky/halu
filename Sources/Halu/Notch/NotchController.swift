@@ -83,7 +83,7 @@ final class NotchController {
             self.collapse(panel)
         }
         let root = RootView(state: panel.state, model: services.model, notices: services.notices,
-                            claude: services.claude, services: services, actions: panel.actions)
+                            claude: services.claude, messages: services.messages, services: services, actions: panel.actions)
         let host = FirstMouseHostingView(rootView: root)
         host.sizingOptions = []
         host.frame = CGRect(origin: .zero, size: frame.size)
@@ -101,7 +101,7 @@ final class NotchController {
 
     private func display(of panel: ScreenPanel) -> Display {
         Layout.display(expanded: panel.state.isExpanded, hasNotice: services.notices.current != nil,
-                       attention: services.claude.attention.count, hasNotch: panel.state.geometry.hasNotch)
+                       attention: services.attentionCount, hasNotch: panel.state.geometry.hasNotch)
     }
 
     private func expand(_ panel: ScreenPanel, tab: Tab?) {
@@ -162,7 +162,10 @@ final class NotchController {
                     } else if buttons == 0 {
                         let since = panel.hoverSince ?? now
                         panel.hoverSince = since
-                        if now.timeIntervalSince(since) >= hoverDelay { expand(panel, tab: nil) }
+                        // Hovering the indicators opens straight to what they point at.
+                        if now.timeIntervalSince(since) >= hoverDelay {
+                            expand(panel, tab: current == .badge ? services.attentionTab : nil)
+                        }
                     }
                 } else {
                     panel.hoverSince = nil

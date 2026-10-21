@@ -14,6 +14,8 @@ enum Layout {
     static let noticeWidth: CGFloat = 440
     /// The concave flare at the top corners; the body of the shape is inset by it.
     static let flare: CGFloat = 8
+    /// Width of each side of the collapsed notch when it carries indicators.
+    static let badgeWing: CGFloat = 66
 
     static func display(expanded: Bool, hasNotice: Bool, attention: Int, hasNotch: Bool) -> Display {
         if expanded { return .expanded }
@@ -37,7 +39,7 @@ enum Layout {
         case .notch:
             return CGSize(width: g.notchSize.width + flare * 2, height: g.notchSize.height)
         case .badge:
-            return CGSize(width: g.notchSize.width + flare * 2 + 84, height: g.hasNotch ? g.notchSize.height : 28)
+            return CGSize(width: g.notchSize.width + flare * 2 + badgeWing * 2, height: g.hasNotch ? g.notchSize.height : 28)
         case .notice:
             return CGSize(width: noticeWidth, height: noticeTop(g) + 70)
         case .expanded:

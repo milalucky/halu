@@ -5,12 +5,13 @@ struct RootView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var notices: NoticeCenter
     @ObservedObject var claude: ClaudeStore
+    @ObservedObject var messages: MessagesStore
     let services: Services
     let actions: PanelActions
 
     private var display: Display {
         Layout.display(expanded: state.isExpanded, hasNotice: notices.current != nil,
-                       attention: claude.attention.count, hasNotch: state.geometry.hasNotch)
+                       attention: claude.attention.count + messages.unseen, hasNotch: state.geometry.hasNotch)
     }
 
     var body: some View {
@@ -48,7 +49,10 @@ struct RootView: View {
                     .transition(.opacity.animation(.easeOut(duration: 0.2)))
             }
         case .badge:
-            BadgeView(count: claude.attention.count, geometry: state.geometry) { actions.open(.claude) }
+            BadgeView(claudeWaiting: claude.attention.count, apps: messages.unseenApps,
+                      count: claude.attention.count + messages.unseen, messages: messages) {
+                actions.open(services.attentionTab)
+            }
                 .transition(.opacity)
         case .notch, .hidden:
             Color.clear
@@ -280,26 +284,57 @@ struct AwakeButton: View {
     }
 }
 
-/// Collapsed state when a Claude session is waiting: a glowing mark on the left wing, the count on the right.
+/// Collapsed notch carrying what's waiting: the spinning mark when Claude needs you and the icons of apps
+/// with unread messages on the left wing, the total on the right.
 struct BadgeView: View {
+    let claudeWaiting: Int
+    let apps: [String]
     let count: Int
-    let geometry: NotchGeometry
+    let messages: MessagesStore
     let onTap: () -> Void
 
     var body: some View {
         HStack(spacing: 0) {
-            HaluMark(size: 14, color: Theme.orange, animating: true)
-                .frame(width: 50)
+            HStack(spacing: 4) {
+                if claudeWaiting > 0 {
+                    HaluMark(size: 13, color: Theme.orange, animating: true)
+                }
+                ForEach(apps.prefix(claudeWaiting > 0 ? 2 : 3), id: \.self) { app in
+                    GlowingIcon(image: messages.icon(for: app))
+                }
+            }
+            .frame(width: Layout.badgeWing)
             Spacer(minLength: 0)
             Text("\(count)")
                 .font(Theme.caption(12, weight: .bold))
                 .monospacedDigit()
-                .foregroundStyle(Theme.orange)
-                .frame(width: 50)
+                .foregroundStyle(claudeWaiting > 0 ? Theme.orange : Theme.primary)
+                .frame(width: Layout.badgeWing)
         }
         .padding(.horizontal, Layout.flare)
         .frame(maxHeight: .infinity)
         .contentShape(Rectangle())
         .onTapGesture(perform: onTap)
+    }
+}
+
+/// An app icon with a soft breathing glow, as if it's lit from behind.
+private struct GlowingIcon: View {
+    let image: NSImage?
+    @State private var glow = false
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(nsImage: image).resizable()
+            } else {
+                Image(systemName: "bubble.left.fill").resizable().foregroundStyle(Theme.accent)
+            }
+        }
+        .frame(width: 15, height: 15)
+        .shadow(color: Theme.accent.opacity(glow ? 0.9 : 0.25), radius: glow ? 5 : 2)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.3).repeatForever(autoreverses: true)) { glow = true }
+        }
     }
 }

@@ -8,7 +8,7 @@
 
 ---
 
-Halu stays invisible until you point at the notch, then unfolds into a small panel with the things you reach for all day. It works on external displays too: there, the top centre of the screen acts as a virtual notch.
+Halu stays invisible until you point at the notch, then unfolds into a small panel with the things you reach for all day. When something is waiting (an unread Slack or mail message, a Claude session that needs an answer) its icon glows beside the notch, so you know without opening anything. It works on external displays too: there, the top centre of the screen acts as a virtual notch.
 
 ## Features
 

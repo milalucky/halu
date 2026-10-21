@@ -73,6 +73,15 @@ final class Services {
     let speech = SpeechInput()
     let awake = AwakeController()
 
+    /// Something waiting for the user, shown on the collapsed notch: Claude first, then unread messages.
+    var attentionCount: Int { claude.attention.count + messages.unseen }
+
+    var attentionTab: Tab? {
+        if !claude.attention.isEmpty { return .claude }
+        if messages.unseen > 0 { return .messages }
+        return nil
+    }
+
     func start() {
         calendar.onReminder = { [notices] meeting, startsNow in
             notices.post(.meeting(meeting, startsNow: startsNow))
