@@ -11,6 +11,8 @@ struct IncomingMessage: Identifiable, Equatable {
     var date: Date
     /// Set for messages from a web app (Gmail, Telegram Web): opened in the browser.
     var url: URL?
+    /// Set for unread state read from an open browser tab; opening switches to that tab.
+    var web: WebInbox.Item?
 }
 
 /// Unread messages from Slack, Telegram, mail and other messengers, read from the notifications macOS
@@ -71,6 +73,18 @@ final class MessagesStore: ObservableObject {
     /// When each source (by name) was last in front: its app, or its site in the browser's active tab.
     private var visits: [String: Date] = UserDefaults.standard.dictionary(forKey: "messages.visits") as? [String: Date] ?? [:]
     private var visitTimer: Timer?
+    /// Unread mail from the IMAP integration; its read state comes from the server (ids are negative).
+    private var mail: [IncomingMessage] = []
+    private var notifications: [IncomingMessage] = []
+    /// Unread conversations read from open Slack, Gmail and Telegram tabs, and the sites those tabs cover.
+    private var web: [IncomingMessage] = []
+    private var webCovered: Set<String> = []
+    private let webInbox = WebInbox()
+    private var webTimer: Timer?
+    /// When each web item was first seen, so the list has a sensible order and "x min ago".
+    private var firstSeen: [String: Date] = UserDefaults.standard.dictionary(forKey: "messages.firstSeen") as? [String: Date] ?? [:]
+    /// The inbox the IMAP integration covers (e.g. "Gmail"); its browser tab and notifications step aside.
+    private var mailSource: String?
     private var timer: Timer?
     private let queue = DispatchQueue(label: "halu.messages", qos: .utility)
 
@@ -103,7 +117,56 @@ final class MessagesStore: ObservableObject {
         }
         RunLoop.main.add(visitTimer, forMode: .common)
         self.visitTimer = visitTimer
+        let webTimer = Timer(timeInterval: 20, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.readWebTabs() }
+        }
+        RunLoop.main.add(webTimer, forMode: .common)
+        self.webTimer = webTimer
         reload()
+        readWebTabs()
+    }
+
+    /// Reads unread state from Slack, Gmail and Telegram tabs in the running Chromium browsers.
+    func readWebTabs() {
+        guard isActive() else { return }
+        let running = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
+        let browsers = BrowserMedia.chromium.filter(running.contains)
+        guard !browsers.isEmpty else {
+            web = []
+            webCovered = []
+            merge()
+            return
+        }
+        webInbox.read(browsers: Array(browsers)) { [weak self] snapshot in
+            guard let self else { return }
+            let now = Date()
+            var seen = self.firstSeen.filter { key, _ in snapshot.items.contains { $0.key == key } }
+            self.web = snapshot.items.map { item in
+                let date = seen[item.key] ?? now
+                seen[item.key] = date
+                var message = IncomingMessage(id: Self.stableID(item.key), appID: item.bundleID, appName: item.site.rawValue,
+                                              title: item.title, subtitle: "", body: item.detail, date: date, url: nil, web: item)
+                // A notification for the same conversation gives a preview of what was said.
+                let plain = item.title.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+                if let preview = self.notifications.first(where: { $0.appName == item.site.rawValue && $0.title.contains(plain) }) {
+                    message.subtitle = item.detail
+                    message.body = preview.body
+                    message.date = max(date, preview.date)
+                }
+                return message
+            }
+            self.firstSeen = seen
+            UserDefaults.standard.set(seen, forKey: "messages.firstSeen")
+            self.webCovered = Set(snapshot.covered.map(\.rawValue))
+            self.merge()
+        }
+    }
+
+    private static func stableID(_ key: String) -> Int64 {
+        // FNV-1a, kept positive and above notification record ids.
+        var hash: UInt64 = 0xcbf29ce484222325
+        for byte in key.utf8 { hash = (hash ^ UInt64(byte)) &* 0x100000001b3 }
+        return Int64(hash >> 2) | (1 << 60)
     }
 
     /// Notes which source is in front right now, so its earlier messages count as read.
@@ -127,9 +190,28 @@ final class MessagesStore: ObservableObject {
     private func markVisited(_ name: String) {
         visits[name] = Date()
         UserDefaults.standard.set(visits, forKey: "messages.visits")
-        let before = messages.count
-        messages.removeAll { $0.appName == name && $0.date <= visits[name]! }
-        if messages.count != before { unseen = messages.count }
+        let before = notifications.count
+        notifications.removeAll { $0.appName == name && $0.date <= visits[name]! }
+        if notifications.count != before { merge() }
+    }
+
+    /// Takes the latest unread mail from the IMAP integration (`source` is nil when it's disconnected).
+    func setMail(_ unread: [IncomingMessage], source: String?) {
+        mail = unread.filter { !dismissed.contains($0.id) }
+        mailSource = source
+        merge()
+    }
+
+    /// One list, newest first, with the most truthful source winning for each service: IMAP for the
+    /// connected inbox, then an open browser tab, then notifications.
+    private func merge() {
+        var fromWeb = web.filter { !dismissed.contains($0.id) && $0.appName != mailSource }
+        if mailSource != nil { fromWeb.removeAll { $0.appName == mailSource } }
+        let replaced = webCovered.union(mailSource.map { [$0] } ?? [])
+        let fromNotifications = notifications.filter { !replaced.contains($0.appName) }
+        let combined = (fromNotifications + fromWeb + mail).sorted { $0.date > $1.date }
+        if combined != messages { messages = combined }
+        unseen = combined.count
     }
 
     private nonisolated static func activeTabHost(_ bundleID: String) -> String? {
@@ -155,11 +237,10 @@ final class MessagesStore: ObservableObject {
                         return
                     }
                     self.access = .granted
-                    let fresh = found.filter { message in
+                    self.notifications = found.filter { message in
                         !self.dismissed.contains(message.id) && message.date > (self.visits[message.appName] ?? .distantPast)
                     }
-                    if fresh != self.messages { self.messages = fresh }
-                    self.unseen = fresh.count
+                    self.merge()
                 }
             }
         }
@@ -167,8 +248,9 @@ final class MessagesStore: ObservableObject {
 
     func dismiss(_ message: IncomingMessage) {
         dismissed.insert(message.id)
-        messages.removeAll { $0.id == message.id }
-        unseen = messages.count
+        notifications.removeAll { $0.id == message.id }
+        mail.removeAll { $0.id == message.id }
+        merge()
         saveDismissed()
     }
 
@@ -176,13 +258,17 @@ final class MessagesStore: ObservableObject {
         visible.forEach { dismissed.insert($0.id) }
         Set(visible.map(\.appName)).forEach { visits[$0] = Date() }
         UserDefaults.standard.set(visits, forKey: "messages.visits")
-        messages.removeAll { appFilter == nil || $0.appName == appFilter }
-        unseen = messages.count
+        notifications.removeAll { appFilter == nil || $0.appName == appFilter }
+        mail.removeAll { appFilter == nil || $0.appName == appFilter }
+        merge()
         saveDismissed()
     }
 
     func open(_ message: IncomingMessage) {
-        if let page = message.url {
+        if let item = message.web {
+            webInbox.open(item)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in self?.readWebTabs() }
+        } else if let page = message.url {
             NSWorkspace.shared.open(page)
         } else if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: message.appID) {
             NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
@@ -197,15 +283,19 @@ final class MessagesStore: ObservableObject {
 
     /// Icon of a source by name: the app's own icon when installed, a symbol for web apps.
     func icon(forSource name: String) -> NSImage? {
-        if let message = messages.first(where: { $0.appName == name }), message.url == nil {
+        if let message = messages.first(where: { $0.appName == name }), message.url == nil, message.web == nil {
             return icon(for: message.appID)
+        }
+        // A web app whose desktop app is installed borrows that app's icon.
+        for (bundleID, appName) in Self.messengers where appName == name {
+            if let image = icon(for: bundleID) { return image }
         }
         let symbol = name == "Gmail" || name == "Outlook" ? "envelope.fill" : "bubble.left.fill"
         return NSImage(systemSymbolName: symbol, accessibilityDescription: name)
     }
 
     func icon(for message: IncomingMessage) -> NSImage? {
-        message.url == nil ? icon(for: message.appID) : icon(forSource: message.appName)
+        message.url == nil && message.web == nil ? icon(for: message.appID) : icon(forSource: message.appName)
     }
 
     func icon(for appID: String) -> NSImage? {

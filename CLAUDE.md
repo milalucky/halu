@@ -27,7 +27,7 @@ Native SwiftUI + AppKit app that lives in the MacBook notch and in a virtual not
 Next, after Media:
 
 10. Jira — done: Mine / Sprint / status queue (any assignee), projects auto-discovered (no hardcoded keys — the app must suit anyone), Start + any transition.
-11. Messages — done: Slack, Telegram, other messengers and mail apps, read from the macOS notification database (Full Disk Access). Read = its app or its site's active browser tab was in front after the message (visits tracked every 2 s), or notification gone; up to 7 days; browser notifications mapped to web apps by site (Gmail, Telegram Web…).
+11. Messages — done. Sources by truthfulness: IMAP for the connected inbox (MailStore, read-only EXAMINE + BODY.PEEK); open browser tabs of Slack/Gmail/Telegram Web read via AppleScript JS every 20 s (WebInbox: Slack `.p-channel_sidebar__channel--unread`, Gmail `tr.zA.zE`, Telegram K `.chatlist-chat` badges); otherwise macOS notification database (Full Disk Access). Read = its app or its site's active browser tab was in front after the message (visits tracked every 2 s), or notification gone; up to 7 days; browser notifications mapped to web apps by site (Gmail, Telegram Web…).
 12. Integrations screen in settings for API keys/tokens (Jira, Slack, …), stored in Keychain.
 13. Quick actions next to Keep Awake: VPN on/off first.
 

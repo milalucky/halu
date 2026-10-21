@@ -88,7 +88,7 @@ struct ExpandedView: View {
                     case .media: MediaView(store: services.media)
                     case .messages: MessagesView(store: services.messages)
                     case .jira: JiraView(store: services.jira) { model.tab = .settings }
-                    case .settings: IntegrationsView(model: model, jira: services.jira)
+                    case .settings: IntegrationsView(model: model, jira: services.jira, mail: services.mail)
                     }
                 }
                 .padding(.leading, 18)

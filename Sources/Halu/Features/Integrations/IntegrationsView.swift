@@ -4,6 +4,7 @@ import SwiftUI
 struct IntegrationsView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var jira: JiraStore
+    @ObservedObject var mail: MailStore
 
     var body: some View {
         ScrollView {
@@ -17,6 +18,7 @@ struct IntegrationsView: View {
                 SectionHeader(title: "Integrations", detail: "Tokens are stored in your Keychain")
                     .padding(.top, 8)
                 JiraCard(store: jira)
+                MailCard(store: mail)
                 ComingSoonCard(icon: "number", name: "Slack", detail: "New messages in the Messages tab")
                 ComingSoonCard(icon: "paperplane", name: "Telegram", detail: "New messages in the Messages tab")
             }
@@ -125,6 +127,75 @@ private struct Field: View {
         .padding(.horizontal, 10)
         .frame(height: 30)
         .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Color.white.opacity(0.05)))
+    }
+}
+
+private struct MailCard: View {
+    @ObservedObject var store: MailStore
+    @State private var problem: String?
+    @State private var connecting = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Image(systemName: "envelope").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.red)
+                Text("Mail").font(Theme.body(13.5, weight: .semibold)).foregroundStyle(Theme.primary)
+                Text("unread mail in Messages").font(Theme.caption(11, weight: .regular)).foregroundStyle(Theme.tertiary)
+                Spacer()
+                if store.isConnected {
+                    Text("Connected").font(Theme.caption(11, weight: .semibold)).foregroundStyle(Theme.green)
+                }
+            }
+
+            if store.isConnected {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(store.email).font(Theme.body(12.5)).foregroundStyle(Theme.primary)
+                        Text(store.problem ?? store.lastCheck.map { "Checked \(Fmt.ago($0))" } ?? store.provider.rawValue)
+                            .font(Theme.caption(11, weight: .regular))
+                            .foregroundStyle(store.problem == nil ? Theme.tertiary : Theme.orange)
+                    }
+                    Spacer()
+                    PillButton(title: "Disconnect", tint: Theme.red, prominent: false, action: store.disconnect)
+                }
+            } else {
+                Picker("", selection: $store.draftProvider) {
+                    ForEach(MailStore.Provider.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .fixedSize()
+                if store.draftProvider == .custom {
+                    Field(placeholder: "IMAP server, e.g. imap.company.com", text: $store.draftHost)
+                }
+                Field(placeholder: "Work email", text: $store.draftEmail)
+                Field(placeholder: "App password", text: $store.draftPassword, secure: true)
+                HStack {
+                    if let help = store.draftProvider.passwordHelp {
+                        Link("Create an app password", destination: help)
+                            .font(Theme.caption(11.5, weight: .medium))
+                            .foregroundStyle(Theme.accent)
+                    }
+                    Spacer()
+                    if connecting { ProgressView().controlSize(.small) }
+                    PillButton(title: "Connect") {
+                        connecting = true
+                        Task {
+                            problem = await store.connect()
+                            connecting = false
+                        }
+                    }
+                }
+                Text("Read-only: Halu only looks at what's unread and never marks anything as read. The password stays in your Keychain.")
+                    .font(Theme.caption(11, weight: .regular))
+                    .foregroundStyle(Theme.tertiary)
+                if let problem {
+                    Text(problem).font(Theme.caption(11.5, weight: .regular)).foregroundStyle(Theme.orange)
+                }
+            }
+        }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.card))
     }
 }
 
