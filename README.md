@@ -15,6 +15,7 @@ Halu stays invisible until you point at the notch, then unfolds into a small pan
 - **Tasks.** A single to-do list for the day. Check a task off and it moves to the Done archive, where you can search and restore it. Add tasks by typing or by voice (English or Russian).
 - **Calendar.** Today's and tomorrow's meetings from any calendar on your Mac, including Google. One-click **Join** for Zoom, Google Meet, Teams and Webex. A reminder drops out of the notch 10 minutes before a meeting and again when it starts.
 - **Claude.** Live status of your Claude Code sessions: working, waiting for you, your turn, done, with a progress bar built from each session's plan. When Claude needs an answer, the notch lights up and a notice pops out.
+- **Jira.** Open issues assigned to you, filtered by To Do or In Progress. Start an issue with one click or move it to any status. Connect it in Integrations (the gear) with your Jira address, email and an API token kept in the Keychain.
 - **Shelf.** New screenshots and screen recordings appear here automatically, along with images you copy. Drag them out wherever you need them, or drop any file onto the notch to keep it for later.
 - **Clipboard.** Recent text you copied plus saved snippets, one click to copy again. Anything a password manager marks as secret is never recorded.
 - **Translate.** English ↔ Russian with automatic direction. Type or dictate, then copy the translation.
@@ -23,7 +24,7 @@ Halu stays invisible until you point at the notch, then unfolds into a small pan
 - **Media.** Appears only while something plays: a YouTube tab, Yandex Music, any app. Shows which app is playing and its window title, with play/pause and skip working like the keyboard's media keys.
 - **Keep Awake.** One tap keeps your Mac from sleeping while long work runs, for an hour, three hours or until you turn it off.
 
-On the roadmap: Jira and Slack integrations, a Messages tab, and an iPhone companion app with sync.
+On the roadmap: a Messages tab with Slack and Telegram, quick actions such as VPN, and an iPhone companion app with sync.
 
 ## Requirements
 

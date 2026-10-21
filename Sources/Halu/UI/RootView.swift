@@ -79,6 +79,8 @@ struct ExpandedView: View {
                     case .accounts: AccountsView(store: services.accounts)
                     case .notes: NotesView(store: services.notes)
                     case .media: MediaView(store: services.media)
+                    case .jira: JiraView(store: services.jira) { model.tab = .settings }
+                    case .settings: IntegrationsView(jira: services.jira)
                     }
                 }
                 .padding(.leading, 18)
@@ -157,11 +159,11 @@ struct Sidebar: View {
 
     /// Media only shows up while something plays or sits paused.
     private var tabs: [Tab] {
-        Tab.allCases.filter { $0 != .media || media.source != nil || model.tab == .media }
+        Tab.allCases.filter { $0 != .settings && ($0 != .media || media.source != nil || model.tab == .media) }
     }
 
     var body: some View {
-        VStack(spacing: 2) {
+        VStack(spacing: 1) {
             ForEach(tabs) { tab in
                 TabButton(tab: tab, selected: model.tab == tab, dot: tab == .claude && !claude.attention.isEmpty,
                           selection: selection) {
@@ -169,6 +171,9 @@ struct Sidebar: View {
                 }
             }
             Spacer(minLength: 0)
+            TabButton(tab: .settings, selected: model.tab == .settings, selection: selection) {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { model.tab = .settings }
+            }
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: tabs)
         .padding(.top, 4)
@@ -200,7 +205,7 @@ struct TabButton: View {
                     .font(.system(size: 14, weight: selected ? .semibold : .regular))
                     .foregroundStyle(selected ? Theme.primary : (hovering ? Theme.secondary : Theme.tertiary))
             }
-            .frame(width: 38, height: 32)
+            .frame(width: 38, height: 30)
             .overlay(alignment: .topTrailing) {
                 if dot {
                     Circle().fill(Theme.orange).frame(width: 6, height: 6).offset(x: -6, y: 6)
