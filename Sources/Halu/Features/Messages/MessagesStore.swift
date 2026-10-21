@@ -32,6 +32,16 @@ final class MessagesStore: ObservableObject {
     @Published var appFilter: String?
     /// Unread messages still waiting; drives the sidebar dot and the notch indicators.
     @Published private(set) var unseen = 0
+    /// Sites read from an open browser tab and what they're signed in as (Gmail addresses, Slack workspace).
+    @Published private(set) var webAccounts: [String: [String]] = [:]
+    /// Telegram chat folders found in the Telegram Web tab, and the one Messages follows ("" = all chats).
+    @Published private(set) var telegramFolders: [String] = []
+    @Published var telegramFolder = UserDefaults.standard.string(forKey: "messages.telegramFolder") ?? "" {
+        didSet {
+            UserDefaults.standard.set(telegramFolder, forKey: "messages.telegramFolder")
+            readWebTabs()
+        }
+    }
 
     /// Messenger bundle ids and the names shown for them.
     nonisolated static let messengers: [String: String] = [
@@ -73,8 +83,6 @@ final class MessagesStore: ObservableObject {
     /// When each source (by name) was last in front: its app, or its site in the browser's active tab.
     private var visits: [String: Date] = UserDefaults.standard.dictionary(forKey: "messages.visits") as? [String: Date] ?? [:]
     private var visitTimer: Timer?
-    /// Unread mail from the IMAP integration; its read state comes from the server (ids are negative).
-    private var mail: [IncomingMessage] = []
     private var notifications: [IncomingMessage] = []
     /// Unread conversations read from open Slack, Gmail and Telegram tabs, and the sites those tabs cover.
     private var web: [IncomingMessage] = []
@@ -83,8 +91,6 @@ final class MessagesStore: ObservableObject {
     private var webTimer: Timer?
     /// When each web item was first seen, so the list has a sensible order and "x min ago".
     private var firstSeen: [String: Date] = UserDefaults.standard.dictionary(forKey: "messages.firstSeen") as? [String: Date] ?? [:]
-    /// The inbox the IMAP integration covers (e.g. "Gmail"); its browser tab and notifications step aside.
-    private var mailSource: String?
     private var timer: Timer?
     private let queue = DispatchQueue(label: "halu.messages", qos: .utility)
 
@@ -134,22 +140,25 @@ final class MessagesStore: ObservableObject {
         guard !browsers.isEmpty else {
             web = []
             webCovered = []
+            webAccounts = [:]
             merge()
             return
         }
-        webInbox.read(browsers: Array(browsers)) { [weak self] snapshot in
+        webInbox.read(browsers: Array(browsers), telegramFolder: telegramFolder) { [weak self] snapshot in
             guard let self else { return }
             let now = Date()
             var seen = self.firstSeen.filter { key, _ in snapshot.items.contains { $0.key == key } }
             self.web = snapshot.items.map { item in
                 let date = seen[item.key] ?? now
                 seen[item.key] = date
+                // Gmail rows say which inbox; Slack and Telegram say why they're here.
+                let context = item.site == .gmail ? item.account : ""
                 var message = IncomingMessage(id: Self.stableID(item.key), appID: item.bundleID, appName: item.site.rawValue,
-                                              title: item.title, subtitle: "", body: item.detail, date: date, url: nil, web: item)
-                // A notification for the same conversation gives a preview of what was said.
+                                              title: item.title, subtitle: context, body: item.detail, date: date, url: nil, web: item)
+                // A notification for the same conversation gives what was actually said.
                 let plain = item.title.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
                 if let preview = self.notifications.first(where: { $0.appName == item.site.rawValue && $0.title.contains(plain) }) {
-                    message.subtitle = item.detail
+                    message.subtitle = context.isEmpty ? item.detail : context
                     message.body = preview.body
                     message.date = max(date, preview.date)
                 }
@@ -158,6 +167,11 @@ final class MessagesStore: ObservableObject {
             self.firstSeen = seen
             UserDefaults.standard.set(seen, forKey: "messages.firstSeen")
             self.webCovered = Set(snapshot.covered.map(\.rawValue))
+            let accounts = Dictionary(uniqueKeysWithValues: snapshot.covered.map { ($0.rawValue, snapshot.accounts[$0] ?? []) })
+            if accounts != self.webAccounts { self.webAccounts = accounts }
+            if snapshot.covered.contains(.telegram), snapshot.telegramFolders != self.telegramFolders {
+                self.telegramFolders = snapshot.telegramFolders
+            }
             self.merge()
         }
     }
@@ -195,21 +209,11 @@ final class MessagesStore: ObservableObject {
         if notifications.count != before { merge() }
     }
 
-    /// Takes the latest unread mail from the IMAP integration (`source` is nil when it's disconnected).
-    func setMail(_ unread: [IncomingMessage], source: String?) {
-        mail = unread.filter { !dismissed.contains($0.id) }
-        mailSource = source
-        merge()
-    }
-
-    /// One list, newest first, with the most truthful source winning for each service: IMAP for the
-    /// connected inbox, then an open browser tab, then notifications.
+    /// One list, newest first: an open browser tab wins over notifications for its service.
     private func merge() {
-        var fromWeb = web.filter { !dismissed.contains($0.id) && $0.appName != mailSource }
-        if mailSource != nil { fromWeb.removeAll { $0.appName == mailSource } }
-        let replaced = webCovered.union(mailSource.map { [$0] } ?? [])
-        let fromNotifications = notifications.filter { !replaced.contains($0.appName) }
-        let combined = (fromNotifications + fromWeb + mail).sorted { $0.date > $1.date }
+        let fromWeb = web.filter { !dismissed.contains($0.id) }
+        let fromNotifications = notifications.filter { !webCovered.contains($0.appName) }
+        let combined = (fromNotifications + fromWeb).sorted { $0.date > $1.date }
         if combined != messages { messages = combined }
         unseen = combined.count
     }
@@ -249,7 +253,6 @@ final class MessagesStore: ObservableObject {
     func dismiss(_ message: IncomingMessage) {
         dismissed.insert(message.id)
         notifications.removeAll { $0.id == message.id }
-        mail.removeAll { $0.id == message.id }
         merge()
         saveDismissed()
     }
@@ -259,7 +262,6 @@ final class MessagesStore: ObservableObject {
         Set(visible.map(\.appName)).forEach { visits[$0] = Date() }
         UserDefaults.standard.set(visits, forKey: "messages.visits")
         notifications.removeAll { appFilter == nil || $0.appName == appFilter }
-        mail.removeAll { appFilter == nil || $0.appName == appFilter }
         merge()
         saveDismissed()
     }

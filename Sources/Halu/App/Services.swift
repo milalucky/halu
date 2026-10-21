@@ -92,7 +92,6 @@ final class Services {
     let media = MediaStore()
     let jira = JiraStore()
     let messages = MessagesStore()
-    let mail = MailStore()
     let speech = SpeechInput()
     let awake = AwakeController()
 
@@ -116,8 +115,6 @@ final class Services {
         media.isActive = { model.isEnabled(.media) }
         messages.isActive = { model.isEnabled(.messages) }
         shelf.isActive = { model.isEnabled(.shelf) }
-        mail.isActive = { model.isEnabled(.messages) }
-        mail.onUpdate = { [messages, mail] unread in messages.setMail(unread, source: mail.isConnected ? mail.provider.webName : nil) }
         calendar.onReminder = { [notices] meeting, startsNow in
             notices.post(.meeting(meeting, startsNow: startsNow))
         }
@@ -136,6 +133,5 @@ final class Services {
         media.start()
         jira.start()
         messages.start()
-        mail.start()
     }
 }

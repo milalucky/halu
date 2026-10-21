@@ -25,10 +25,13 @@ struct MessagesView: View {
                 if store.apps.count > 1 {
                     FilterChip(title: "All", selected: store.appFilter == nil) { store.appFilter = nil }
                     ForEach(store.apps, id: \.self) { app in
-                        FilterChip(title: app, selected: store.appFilter == app) { store.appFilter = app }
+                        FilterChip(title: app, color: SourceColor.of(app), selected: store.appFilter == app) { store.appFilter = app }
                     }
                 }
                 Spacer()
+                if store.telegramFolders.count > 1 {
+                    TelegramFolderMenu(store: store)
+                }
                 if !store.visible.isEmpty {
                     Button("Clear") { withAnimation { store.dismissAll() } }
                         .buttonStyle(.plain)
@@ -53,14 +56,30 @@ struct MessagesView: View {
     }
 }
 
+/// A quiet colour per source instead of app icons.
+enum SourceColor {
+    static func of(_ source: String) -> Color {
+        switch source {
+        case "Slack": Color(red: 0.88, green: 0.36, blue: 0.56)
+        case "Telegram": Color(red: 0.36, green: 0.70, blue: 0.95)
+        case "Gmail", "Mail", "Outlook", "Spark": Color(red: 0.96, green: 0.52, blue: 0.42)
+        default: Theme.accent
+        }
+    }
+}
+
 private struct FilterChip: View {
     let title: String
+    var color: Color?
     let selected: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Text(title)
+            HStack(spacing: 5) {
+                if let color { Circle().fill(color).frame(width: 6, height: 6) }
+                Text(title)
+            }
                 .font(Theme.caption(11.5, weight: .semibold))
                 .foregroundStyle(selected ? Color.black.opacity(0.85) : Theme.secondary)
                 .padding(.horizontal, 10)
@@ -71,6 +90,39 @@ private struct FilterChip: View {
     }
 }
 
+/// Which Telegram folder Messages follows, from the folders of the Telegram Web tab.
+private struct TelegramFolderMenu: View {
+    @ObservedObject var store: MessagesStore
+
+    var body: some View {
+        Menu {
+            ForEach(store.telegramFolders, id: \.self) { folder in
+                Button {
+                    store.telegramFolder = folder
+                } label: {
+                    if folder.lowercased() == current.lowercased() { Label(folder, systemImage: "checkmark") } else { Text(folder) }
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Circle().fill(SourceColor.of("Telegram")).frame(width: 6, height: 6)
+                Text(current)
+                Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
+            }
+            .font(Theme.caption(11.5, weight: .medium))
+            .foregroundStyle(Theme.secondary)
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .fixedSize()
+        .help("Telegram folder to follow")
+    }
+
+    private var current: String {
+        store.telegramFolder.isEmpty ? (store.telegramFolders.first ?? "All") : store.telegramFolder
+    }
+}
+
 private struct MessageRow: View {
     let message: IncomingMessage
     @ObservedObject var store: MessagesStore
@@ -78,14 +130,10 @@ private struct MessageRow: View {
     var body: some View {
         HoverRow { hovering in
             HStack(alignment: .top, spacing: 10) {
-                Group {
-                    if let icon = store.icon(for: message) {
-                        Image(nsImage: icon).resizable()
-                    } else {
-                        Image(systemName: "bubble.left.fill").foregroundStyle(Theme.tertiary)
-                    }
-                }
-                .frame(width: 26, height: 26)
+                Capsule()
+                    .fill(SourceColor.of(message.appName))
+                    .frame(width: 3)
+                    .padding(.vertical, 2)
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
@@ -111,6 +159,6 @@ private struct MessageRow: View {
             }
         }
         .onTapGesture { store.open(message) }
-        .help("Open \(message.appName)")
+        .help("Open in \(message.appName)")
     }
 }

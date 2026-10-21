@@ -15,7 +15,7 @@ enum Layout {
     /// The concave flare at the top corners; the body of the shape is inset by it.
     static let flare: CGFloat = 8
     /// Width of each side of the collapsed notch when it carries indicators.
-    static let badgeWing: CGFloat = 66
+    static let badgeWing: CGFloat = 30
 
     static func display(expanded: Bool, hasNotice: Bool, attention: Int, hasNotch: Bool) -> Display {
         if expanded { return .expanded }

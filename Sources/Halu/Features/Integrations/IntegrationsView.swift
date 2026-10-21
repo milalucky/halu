@@ -4,7 +4,7 @@ import SwiftUI
 struct IntegrationsView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var jira: JiraStore
-    @ObservedObject var mail: MailStore
+    @ObservedObject var messages: MessagesStore
 
     var body: some View {
         ScrollView {
@@ -15,12 +15,12 @@ struct IntegrationsView: View {
                         TabToggle(tab: tab, model: model)
                     }
                 }
-                SectionHeader(title: "Integrations", detail: "Tokens are stored in your Keychain")
+                SectionHeader(title: "Integrations", detail: "Jira's token stays in your Keychain; the rest is read from open tabs")
                     .padding(.top, 8)
                 JiraCard(store: jira)
-                MailCard(store: mail)
-                ComingSoonCard(icon: "number", name: "Slack", detail: "New messages in the Messages tab")
-                ComingSoonCard(icon: "paperplane", name: "Telegram", detail: "New messages in the Messages tab")
+                ForEach(WebInbox.Site.allCases, id: \.self) { site in
+                    WebSourceCard(site: site, accounts: messages.webAccounts[site.rawValue])
+                }
             }
         }
         .scrollIndicators(.never)
@@ -130,91 +130,35 @@ private struct Field: View {
     }
 }
 
-private struct MailCard: View {
-    @ObservedObject var store: MailStore
-    @State private var problem: String?
-    @State private var connecting = false
+/// Slack, Gmail and Telegram need no tokens: Messages reads them from their open browser tabs.
+private struct WebSourceCard: View {
+    let site: WebInbox.Site
+    /// Nil while no tab of the site is open.
+    let accounts: [String]?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                Image(systemName: "envelope").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.red)
-                Text("Mail").font(Theme.body(13.5, weight: .semibold)).foregroundStyle(Theme.primary)
-                Text("unread mail in Messages").font(Theme.caption(11, weight: .regular)).foregroundStyle(Theme.tertiary)
-                Spacer()
-                if store.isConnected {
-                    Text("Connected").font(Theme.caption(11, weight: .semibold)).foregroundStyle(Theme.green)
-                }
+        HStack(spacing: 10) {
+            Circle().fill(SourceColor.of(site.rawValue)).frame(width: 8, height: 8).frame(width: 16)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(site.rawValue).font(Theme.body(13, weight: .semibold)).foregroundStyle(Theme.primary)
+                Text(detail).font(Theme.caption(11, weight: .regular)).foregroundStyle(Theme.tertiary).lineLimit(1)
             }
-
-            if store.isConnected {
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(store.email).font(Theme.body(12.5)).foregroundStyle(Theme.primary)
-                        Text(store.problem ?? store.lastCheck.map { "Checked \(Fmt.ago($0))" } ?? store.provider.rawValue)
-                            .font(Theme.caption(11, weight: .regular))
-                            .foregroundStyle(store.problem == nil ? Theme.tertiary : Theme.orange)
-                    }
-                    Spacer()
-                    PillButton(title: "Disconnect", tint: Theme.red, prominent: false, action: store.disconnect)
-                }
-            } else {
-                Picker("", selection: $store.draftProvider) {
-                    ForEach(MailStore.Provider.allCases) { Text($0.rawValue).tag($0) }
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .fixedSize()
-                if store.draftProvider == .custom {
-                    Field(placeholder: "IMAP server, e.g. imap.company.com", text: $store.draftHost)
-                }
-                Field(placeholder: "Work email", text: $store.draftEmail)
-                Field(placeholder: "App password", text: $store.draftPassword, secure: true)
-                HStack {
-                    if let help = store.draftProvider.passwordHelp {
-                        Link("Create an app password", destination: help)
-                            .font(Theme.caption(11.5, weight: .medium))
-                            .foregroundStyle(Theme.accent)
-                    }
-                    Spacer()
-                    if connecting { ProgressView().controlSize(.small) }
-                    PillButton(title: "Connect") {
-                        connecting = true
-                        Task {
-                            problem = await store.connect()
-                            connecting = false
-                        }
-                    }
-                }
-                Text("Read-only: Halu only looks at what's unread and never marks anything as read. The password stays in your Keychain.")
-                    .font(Theme.caption(11, weight: .regular))
-                    .foregroundStyle(Theme.tertiary)
-                if let problem {
-                    Text(problem).font(Theme.caption(11.5, weight: .regular)).foregroundStyle(Theme.orange)
-                }
-            }
+            Spacer()
+            Text(accounts == nil ? "No open tab" : "Connected")
+                .font(Theme.caption(11, weight: .semibold))
+                .foregroundStyle(accounts == nil ? Theme.tertiary : Theme.green)
         }
         .padding(14)
         .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.card))
     }
-}
 
-private struct ComingSoonCard: View {
-    let icon: String
-    let name: String
-    let detail: String
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.tertiary).frame(width: 16)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(name).font(Theme.body(13, weight: .semibold)).foregroundStyle(Theme.secondary)
-                Text(detail).font(Theme.caption(11, weight: .regular)).foregroundStyle(Theme.tertiary)
-            }
-            Spacer()
-            Text("Soon").font(Theme.caption(11, weight: .semibold)).foregroundStyle(Theme.tertiary)
+    private var detail: String {
+        guard let accounts else { return "Keep \(site.host) open in Chrome, even in the background" }
+        let what = switch site {
+        case .slack: "Direct messages and mentions"
+        case .gmail: "Unread mail"
+        case .telegram: "Unread chats"
         }
-        .padding(14)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.card.opacity(0.6)))
+        return accounts.isEmpty ? "\(what), from the open tab" : "\(what) · " + accounts.joined(separator: ", ")
     }
 }
