@@ -61,6 +61,8 @@ Settings → Appearance also has Colours (Style: Minimal / Playful / Neon — pe
 
 Themes (Style): Minimal, Playful (default), Neon, Glass — each changes the panel backdrop (PanelBackground), card tint (Theme.card follows the theme), sidebar icon colours, and Neon adds a travelling gradient rim (NeonRim). Light Glass was dropped. Tools sections (modes and utilities) can be hidden in Settings (ToolsStore.hidden). Converter is its own Tools mode (ConverterKind: money via open.er-api rates, units via Measurement); the Calculator line is for sums. Money: Spending/Income switch, currency words in the entry line ($100, 20 евро) counted in roubles via market rates, income words flip to income, category chips; Plan (expected income, regular payments, savings goal, limits) and Categories (edit/hide/delete/add).
 
+Recordly (dev.recordly.app, Electron, no URL scheme/AppleScript): the header record button folds the panel and presses the user's shortcut (default ⌥3, Settings → Recordly) via CGEvent; "Show controls" sends the reopen Apple event. Recording state = Recordly's menu bar icon exists (AX extras menu bar); stop presses its "Stop Recording" item.
+
 Tabs are configurable in Settings (gear): all on by default; a disabled tab hides from the sidebar, pauses its store's background work (`isActive`), and drops its notch indicators.
 
 ## Roadmap

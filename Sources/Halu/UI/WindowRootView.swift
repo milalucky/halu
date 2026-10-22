@@ -17,6 +17,7 @@ struct WindowRootView: View {
                 ClaudeUsagePill(requests: services.claudeRequests)
                 SpeedLabel(speed: services.speed)
                 ChatButton(model: model)
+                RecordButton(recordly: services.recordly)
                 PomodoroButton(pomodoro: services.pomodoro)
                 VPNButton(vpn: services.vpn)
                 AwakeButton(awake: services.awake)

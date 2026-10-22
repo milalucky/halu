@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         services.start()
         services.openWindow = { [weak self] in self?.showWindow() }
+        services.collapsePanel = { [weak self] in self?.controller?.collapseAll() }
         controller = NotchController(services: services)
         setupStatusItem()
         setupHotKeys()

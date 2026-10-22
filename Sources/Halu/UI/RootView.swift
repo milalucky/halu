@@ -291,6 +291,7 @@ struct HeaderBar: View {
                 ClaudeUsagePill(requests: Services.shared.claudeRequests)
                 SpeedLabel(speed: speed)
                 ChatButton(model: model)
+                RecordButton(recordly: Services.shared.recordly)
                 PomodoroButton(pomodoro: Services.shared.pomodoro)
                 VPNButton(vpn: vpn)
                 AwakeButton(awake: awake)

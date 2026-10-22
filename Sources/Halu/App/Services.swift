@@ -180,9 +180,12 @@ final class Services {
     let screenTools = ScreenTools()
     let market = MarketStore()
     let finance = FinanceStore()
+    let recordly = RecordlyBridge()
     let gitlab = GitLabStore()
     /// Opens Halu as a normal window that stays open; set by the app delegate.
     var openWindow: () -> Void = {}
+    /// Folds the notch panel away (set by the app delegate).
+    var collapsePanel: () -> Void = {}
     let vpn = VPNController()
     let speed = NetworkSpeed()
     let pomodoro = PomodoroTimer()
@@ -273,6 +276,7 @@ final class Services {
         jira.start()
         messages.start()
         vpn.start()
+        recordly.start()
         finance.rates = { [market] in market.rates }
         market.loadRates()
         gitlab.isActive = { model.isEnabled(.gitlab) }

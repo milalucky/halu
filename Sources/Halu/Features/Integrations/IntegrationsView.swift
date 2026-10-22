@@ -35,6 +35,7 @@ struct IntegrationsView: View {
                 JiraCard(store: jira)
                 GitLabCard(store: gitlab)
                 WeatherCard(weather: Services.shared.weather)
+                RecordlyCard(recordly: Services.shared.recordly)
                 ForEach(WebInbox.Site.allCases, id: \.self) { site in
                     WebSourceCard(site: site, accounts: messages.webAccounts[site.rawValue])
                 }
@@ -60,6 +61,28 @@ struct IntegrationsView: View {
                 ForEach(AppModel.HoverDelay.allCases) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented).labelsHidden().fixedSize()
+        }
+    }
+}
+
+/// Recordly: the shortcut Halu presses to start a recording.
+private struct RecordlyCard: View {
+    @ObservedObject var recordly: RecordlyBridge
+
+    var body: some View {
+        if recordly.isInstalled {
+            HStack(spacing: 10) {
+                Image(systemName: "record.circle").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.red)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Recordly").font(Theme.body(13.5, weight: .semibold)).foregroundStyle(Theme.primary)
+                    Text("The record button presses this shortcut · ⌘ ⌥ ⌃ ⇧ plus a letter or digit")
+                        .font(Theme.caption(11, weight: .regular)).foregroundStyle(Theme.tertiary)
+                }
+                Spacer()
+                Field(placeholder: "⌥3", text: $recordly.shortcut).frame(width: 70)
+            }
+            .padding(14)
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.card))
         }
     }
 }
