@@ -73,7 +73,8 @@ struct WeekRecap {
         var hours = 0.0
         if EKEventStore.authorizationStatus(for: .event) == .fullAccess {
             let events = store.events(matching: store.predicateForEvents(withStart: range.lowerBound, end: min(range.upperBound, Date()), calendars: nil))
-            for event in events where !event.isAllDay && event.status != .canceled && event.endDate.timeIntervalSince(event.startDate) < 6 * 3600 {
+            for event in events where !event.isAllDay && event.status != .canceled && event.endDate.timeIntervalSince(event.startDate) < 6 * 3600
+                && !Meeting.isLunch(event.title ?? "") {
                 meetings += 1
                 hours += event.endDate.timeIntervalSince(event.startDate) / 3600
             }

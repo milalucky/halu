@@ -13,6 +13,15 @@ struct Meeting: Identifiable, Equatable {
     let joinURL: URL?
 
     func isLive(at now: Date) -> Bool { start <= now && end > now }
+
+    /// Lunch is time off, not a call: no countdown or Join, just a note when it starts and a snake
+    /// on the notch while it lasts.
+    var isLunch: Bool { joinURL == nil && Self.isLunch(title) }
+
+    static func isLunch(_ title: String) -> Bool {
+        let title = title.lowercased()
+        return ["lunch", "обед", "ланч"].contains { title.contains($0) }
+    }
 }
 
 /// Reads events through EventKit, so a Google account added in System Settings → Internet Accounts
@@ -27,9 +36,10 @@ final class CalendarStore: ObservableObject {
     @Published private(set) var access: Access = .unknown
     @Published private(set) var meetings: [Meeting] = []
 
-    enum Reminder { case soon, oneMinute, started, stillGoing }
+    enum Reminder { case soon, oneMinute, started, stillGoing, lunch }
 
     /// Called for each reminder: 5 min before, 1 min before, at the start, and 2 min in if you haven't joined.
+    /// Lunch gets only one, as it starts.
     var onReminder: (Meeting, Reminder) -> Void = { _, _ in }
     /// How long before a meeting the notch starts counting down.
     let countdownLead: TimeInterval = 15 * 60
@@ -114,7 +124,7 @@ final class CalendarStore: ObservableObject {
     /// and not joined. Video calls first.
     func countdown(at now: Date = .now) -> Meeting? {
         meetings.filter { meeting in
-            guard !meeting.isAllDay, !joined.contains(meeting.id), !dismissed.contains(meeting.id) else { return false }
+            guard !meeting.isAllDay, !meeting.isLunch, !joined.contains(meeting.id), !dismissed.contains(meeting.id) else { return false }
             let lead = meeting.start.timeIntervalSince(now)
             return lead <= countdownLead && lead > -10 * 60
         }
@@ -122,6 +132,11 @@ final class CalendarStore: ObservableObject {
             if (a.joinURL != nil) != (b.joinURL != nil) { return a.joinURL != nil }
             return a.start < b.start
         }
+    }
+
+    /// Lunch going on now, unless you closed it on the notch.
+    func lunch(at now: Date = .now) -> Meeting? {
+        meetings.first { $0.isLunch && !$0.isAllDay && $0.isLive(at: now) && !dismissed.contains($0.id) }
     }
 
     /// Opens the call and stops the reminders for it.
@@ -144,6 +159,10 @@ final class CalendarStore: ObservableObject {
         let now = Date()
         for meeting in meetings where !meeting.isAllDay && !joined.contains(meeting.id) {
             let lead = meeting.start.timeIntervalSince(now)
+            if meeting.isLunch {
+                if lead <= 5, lead > -10 * 60, meeting.end > now, notified.insert(meeting.id).inserted { onReminder(meeting, .lunch) }
+                continue
+            }
             let steps: [(Reminder, Bool)] = [
                 (.soon, lead <= 5 * 60 && lead > 90),
                 (.oneMinute, lead <= 75 && lead > 5),

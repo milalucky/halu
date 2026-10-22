@@ -61,3 +61,27 @@ struct NotchEdge: Shape {
         return path
     }
 }
+
+/// The notch's whole visible edge as one open line: in from the left screen edge along the top flare,
+/// down, across the bottom and up and out the other side. Inset like `NotchEdge`.
+struct NotchOutline: Shape {
+    var topRadius: CGFloat
+    var bottomRadius: CGFloat
+    var inset: CGFloat = 1.5
+
+    func path(in full: CGRect) -> Path {
+        let rect = full.insetBy(dx: inset, dy: 0).divided(atDistance: inset, from: .maxYEdge).remainder
+        let top = min(topRadius, rect.width / 4)
+        let bottom = max(0, min(bottomRadius, rect.height - top, (rect.width - top * 2) / 2))
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addQuadCurve(to: CGPoint(x: rect.minX + top, y: rect.minY + top), control: CGPoint(x: rect.minX + top, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.minX + top, y: rect.maxY - bottom))
+        path.addQuadCurve(to: CGPoint(x: rect.minX + top + bottom, y: rect.maxY), control: CGPoint(x: rect.minX + top, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.maxX - top - bottom, y: rect.maxY))
+        path.addQuadCurve(to: CGPoint(x: rect.maxX - top, y: rect.maxY - bottom), control: CGPoint(x: rect.maxX - top, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.maxX - top, y: rect.minY + top))
+        path.addQuadCurve(to: CGPoint(x: rect.maxX, y: rect.minY), control: CGPoint(x: rect.maxX - top, y: rect.minY))
+        return path
+    }
+}
