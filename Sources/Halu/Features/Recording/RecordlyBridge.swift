@@ -4,9 +4,8 @@ import SwiftUI
 
 /// A remote for Recordly (dev.recordly.app), the screen recorder. Recordly has no URL scheme,
 /// AppleScript or global shortcut, so:
-/// - "Record" presses the user's own shortcut for starting a recording (⌥3, set in Settings), which
-///   brings up Recordly's area picker; without a shortcut it sends the reopen event, which shows its
-///   controls;
+/// - "Record" brings Recordly forward with its window (it has no shortcut or command to start a
+///   recording from outside), or opens the macOS recording bar if that's chosen in Settings;
 /// - while it records it shows a menu bar icon; Halu reads that through Accessibility to know a
 ///   recording is running, and presses its "Stop Recording" item to stop.
 @MainActor
@@ -17,51 +16,35 @@ final class RecordlyBridge: ObservableObject {
     @Published private(set) var isRecording = false
     @Published private(set) var since: Date?
 
-    /// The keyboard shortcut that starts a recording, as "⌥3"; empty to use Recordly's window instead.
-    @Published var shortcut = UserDefaults.standard.string(forKey: "recordly.shortcut") ?? "⌥3" {
-        didSet { UserDefaults.standard.set(shortcut, forKey: "recordly.shortcut") }
+    enum Recorder: String, CaseIterable, Identifiable {
+        case recordly = "Recordly", macOS = "macOS"
+        var id: String { rawValue }
+    }
+
+    /// What the record button opens: Recordly's own window, or the macOS screen recording bar (⌘⇧5).
+    @Published var recorder = Recorder(rawValue: UserDefaults.standard.string(forKey: "recordly.recorder") ?? "") ?? .recordly {
+        didSet { UserDefaults.standard.set(recorder.rawValue, forKey: "recordly.recorder") }
     }
 
     private var timer: Timer?
 
-    /// Starts a recording: the shortcut if there is one, else Recordly's own controls.
+    /// Starts a recording the chosen way. Recordly has no way to start recording from outside, so
+    /// Halu brings its window forward, where you pick the area and press record.
     func record() {
         Services.shared.collapsePanel()
-        if let (key, flags) = Self.parse(shortcut), AXIsProcessTrusted() {
-            // Let the panel close first, so the area picker isn't covered.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                let source = CGEventSource(stateID: .combinedSessionState)
-                for down in [true, false] {
-                    let event = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: down)
-                    event?.flags = flags
-                    event?.post(tap: .cghidEventTap)
-                }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [self] in
+            switch recorder {
+            case .recordly where isInstalled: showControls()
+            default: recordWithMacOS()
             }
-        } else {
-            showControls()
         }
     }
 
-    /// "⌥3", "⌃⇧R", "⌘⇧5" → key code and modifier flags.
-    private static func parse(_ text: String) -> (CGKeyCode, CGEventFlags)? {
-        var flags: CGEventFlags = []
-        var rest = ""
-        for char in text {
-            switch char {
-            case "⌘": flags.insert(.maskCommand)
-            case "⌥": flags.insert(.maskAlternate)
-            case "⌃": flags.insert(.maskControl)
-            case "⇧": flags.insert(.maskShift)
-            default: rest.append(char)
-            }
-        }
-        let keys: [String: CGKeyCode] = [
-            "0": 29, "1": 18, "2": 19, "3": 20, "4": 21, "5": 23, "6": 22, "7": 26, "8": 28, "9": 25,
-            "A": 0, "B": 11, "C": 8, "D": 2, "E": 14, "F": 3, "G": 5, "H": 4, "I": 34, "J": 38, "K": 40, "L": 37, "M": 46,
-            "N": 45, "O": 31, "P": 35, "Q": 12, "R": 15, "S": 1, "T": 17, "U": 32, "V": 9, "W": 13, "X": 7, "Y": 16, "Z": 6,
-        ]
-        guard !flags.isEmpty, let key = keys[rest.uppercased().trimmingCharacters(in: .whitespaces)] else { return nil }
-        return (key, flags)
+    /// The macOS screenshot and screen recording bar; recordings land in the screenshot folder,
+    /// so they show up on the Shelf.
+    func recordWithMacOS() {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.screenshot.launcher") else { return }
+        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
     }
 
     func start() {
@@ -73,12 +56,17 @@ final class RecordlyBridge: ObservableObject {
         refresh()
     }
 
-    /// Opens Recordly's controls (launching it if needed).
+    /// Brings Recordly forward (launching it if needed) with its window showing.
     func showControls() {
-        DispatchQueue.global(qos: .userInitiated).async {
-            var error: NSDictionary?
-            NSAppleScript(source: "tell application id \"\(Self.bundleID)\" to reopen")?.executeAndReturnError(&error)
-            NSAppleScript(source: "tell application id \"\(Self.bundleID)\" to activate")?.executeAndReturnError(&error)
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: Self.bundleID) else { return }
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        NSWorkspace.shared.openApplication(at: url, configuration: configuration) { _, _ in
+            // The reopen event makes Electron show its window again if it was closed.
+            DispatchQueue.global(qos: .userInitiated).async {
+                var error: NSDictionary?
+                NSAppleScript(source: "tell application id \"\(Self.bundleID)\" to reopen")?.executeAndReturnError(&error)
+            }
         }
     }
 
@@ -144,7 +132,7 @@ struct RecordButton: View {
     @State private var hovering = false
 
     var body: some View {
-        if recordly.isInstalled {
+        if recordly.isInstalled || recordly.recorder == .macOS {
             Button {
                 recordly.isRecording ? recordly.stop() : recordly.record()
             } label: {
@@ -165,17 +153,19 @@ struct RecordButton: View {
             .onHover { hovering = $0 }
             .help(help)
             .contextMenu {
-                Button(recordly.isRecording ? "Stop recording" : "Record (\(recordly.shortcut))") {
-                    recordly.isRecording ? recordly.stop() : recordly.record()
+                if recordly.isRecording {
+                    Button("Stop recording", action: recordly.stop)
                 }
-                Button("Show Recordly's controls", action: recordly.showControls)
-                Button("Open Recordly", action: recordly.openApp)
+                Button("Record with Recordly", action: recordly.showControls)
+                Button("Record with macOS (⌘⇧5)", action: recordly.recordWithMacOS)
             }
         }
     }
 
     private var help: String {
-        guard recordly.isRecording else { return "Record the screen with Recordly (\(recordly.shortcut))" }
+        guard recordly.isRecording else {
+            return recordly.recorder == .recordly ? "Record the screen with Recordly · right-click for macOS recording" : "Record the screen (macOS) · right-click for Recordly"
+        }
         let seconds = Int(Date().timeIntervalSince(recordly.since ?? Date()))
         return "Recording · \(seconds / 60):\(String(format: "%02d", seconds % 60)) · click to stop"
     }
