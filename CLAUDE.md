@@ -63,6 +63,8 @@ Themes (Style): Minimal, Playful (default), Neon, Glass — each changes the pan
 
 Recordly (dev.recordly.app, Electron, no URL scheme/AppleScript): the header record button folds the panel and presses the user's shortcut (default ⌥3, Settings → Recordly) via CGEvent; "Show controls" sends the reopen Apple event. Recording state = Recordly's menu bar icon exists (AX extras menu bar); stop presses its "Stop Recording" item.
 
+Google Meet join links get `authuser=<email>` (CalendarStore.meetLink) so the call opens in the right Google account: the email from Settings → Google Meet ("meet.account"), else the meeting calendar's account.
+
 Tabs are configurable in Settings (gear): all on by default; a disabled tab hides from the sidebar, pauses its store's background work (`isActive`), and drops its notch indicators.
 
 ## Roadmap

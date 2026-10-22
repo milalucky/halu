@@ -169,9 +169,29 @@ final class CalendarStore: ObservableObject {
             let range = NSRange(text.startIndex..., in: text)
             for match in detector?.matches(in: text, range: range) ?? [] {
                 guard let url = match.url, let host = url.host?.lowercased() else { continue }
-                if callHosts.contains(where: { host == $0 || host.hasSuffix(".\($0)") }) { return url }
+                if callHosts.contains(where: { host == $0 || host.hasSuffix(".\($0)") }) {
+                    return host == "meet.google.com" ? meetLink(url, account: meetAccount(for: event)) : url
+                }
             }
         }
         return nil
+    }
+
+    /// The Google account to join Meet with: the one set in Settings, or else the account the
+    /// meeting's calendar belongs to (a work calendar joins as work).
+    private static func meetAccount(for event: EKEvent) -> String? {
+        let chosen = (UserDefaults.standard.string(forKey: "meet.account") ?? "").trimmingCharacters(in: .whitespaces)
+        if chosen.contains("@") { return chosen }
+        return [event.calendar.source?.title, event.calendar.title].compactMap { $0 }.first { $0.contains("@") }
+    }
+
+    /// Adds `authuser=<email>`, which makes Google open the call in that account instead of the
+    /// browser's default one.
+    static func meetLink(_ url: URL, account: String?) -> URL {
+        guard let account, var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url }
+        var items = (parts.queryItems ?? []).filter { $0.name != "authuser" }
+        items.append(URLQueryItem(name: "authuser", value: account))
+        parts.queryItems = items
+        return parts.url ?? url
     }
 }

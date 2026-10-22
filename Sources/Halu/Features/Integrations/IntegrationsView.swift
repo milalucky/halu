@@ -34,6 +34,7 @@ struct IntegrationsView: View {
                     .padding(.top, 8)
                 JiraCard(store: jira)
                 GitLabCard(store: gitlab)
+                MeetCard()
                 WeatherCard(weather: Services.shared.weather)
                 RecordlyCard(recordly: Services.shared.recordly)
                 ForEach(WebInbox.Site.allCases, id: \.self) { site in
@@ -84,6 +85,28 @@ private struct RecordlyCard: View {
             .padding(14)
             .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.card))
         }
+    }
+}
+
+/// Which Google account Join opens Meet calls with.
+private struct MeetCard: View {
+    @AppStorage("meet.account") private var account = ""
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "video.fill").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.green)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Google Meet").font(Theme.body(13.5, weight: .semibold)).foregroundStyle(Theme.primary)
+                Text("Join opens calls in this account. Empty: the account of the meeting's calendar.")
+                    .font(Theme.caption(11, weight: .regular)).foregroundStyle(Theme.tertiary)
+            }
+            Spacer()
+            Field(placeholder: "work@company.com", text: $account)
+                .frame(width: 210)
+                .onSubmit { Services.shared.calendar.reload() }
+        }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.card))
     }
 }
 
