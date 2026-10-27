@@ -155,7 +155,8 @@ func summary(of input: [String: Any]) -> String {
 
 func askHalu(event: String, payload: [String: Any], session: ClaudeSession) {
     guard haluIsRunning() else { return }
-    let isQuestion = event == "PreToolUse"
+    // AskUserQuestion can reach us as PreToolUse or as a PermissionRequest; either way it's a question.
+    let isQuestion = toolName == "AskUserQuestion"
     let questions: [ClaudeRequest.Question] = (toolInput["questions"] as? [[String: Any]] ?? []).compactMap { item -> ClaudeRequest.Question? in
         guard let text = item["question"] as? String else { return nil }
         let options = (item["options"] as? [[String: Any]] ?? []).compactMap { option -> ClaudeRequest.Option? in
@@ -198,7 +199,9 @@ func askHalu(event: String, payload: [String: Any], session: ClaudeSession) {
         guard let answers = answer.answers, answer.decision != .deny else { return }
         var updated = toolInput
         updated["answers"] = answers
-        output = ["hookEventName": "PreToolUse", "permissionDecision": "allow", "updatedInput": updated]
+        output = event == "PreToolUse"
+            ? ["hookEventName": "PreToolUse", "permissionDecision": "allow", "updatedInput": updated]
+            : ["hookEventName": "PermissionRequest", "decision": ["behavior": "allow", "updatedInput": updated]]
     } else {
         var decision: [String: Any]
         switch answer.decision {
