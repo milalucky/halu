@@ -8,6 +8,8 @@ final class Teleprompter: ObservableObject {
     @AppStorage("prompter.script") var script = ""
     @AppStorage("prompter.speed") var speed = 30.0
     @AppStorage("prompter.size") var size = 22.0
+    /// White background with dark text, for reading in a bright room.
+    @AppStorage("prompter.light") var light = false
     @Published private(set) var isShowing = false
     @Published var paused = false
     /// Points scrolled so far.
@@ -30,7 +32,11 @@ final class Teleprompter: ObservableObject {
         panel.hasShadow = true
         panel.sharingType = .none
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.contentView = NSHostingView(rootView: PrompterOverlay(prompter: self))
+        let host = NSHostingView(rootView: PrompterOverlay(prompter: self).frame(width: size.width, height: size.height))
+        // The text is taller than the window; don't let it resize the window to fit.
+        host.sizingOptions = []
+        host.frame = CGRect(origin: .zero, size: size)
+        panel.contentView = host
         panel.orderFrontRegardless()
         window = panel
         offset = 0
@@ -61,7 +67,7 @@ private struct PrompterOverlay: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            PrompterText(script: prompter.script, size: prompter.size, offset: prompter.offset)
+            PrompterText(script: prompter.script, size: prompter.size, offset: prompter.offset, light: prompter.light)
             if hovering {
                 HStack(spacing: 4) {
                     IconButton(icon: "minus", help: "Slower", size: 10) { prompter.speed = max(5, prompter.speed - 5) }
@@ -75,7 +81,7 @@ private struct PrompterOverlay: View {
                 .padding(8)
             }
         }
-        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(.black.opacity(0.82)))
+        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(prompter.light ? Color.white : Color.black))
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .onHover { hovering = $0 }
         .environment(\.colorScheme, .dark)
@@ -87,11 +93,12 @@ struct PrompterText: View {
     let script: String
     let size: Double
     let offset: CGFloat
+    var light = false
 
     var body: some View {
         Text(script)
             .font(.system(size: size, weight: .semibold, design: .rounded))
-            .foregroundStyle(.white)
+            .foregroundStyle(light ? Color.black : Color.white)
             .multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 24)
@@ -118,13 +125,13 @@ private struct PrompterPreview: View {
                 attributes: [.font: NSFont.systemFont(ofSize: prompter.size, weight: .semibold)]).height + 60
             let travelled = CGFloat(context.date.timeIntervalSince(start) * prompter.speed)
             PrompterText(script: prompter.script.isEmpty ? "Your text scrolls here, at this size and speed." : prompter.script,
-                         size: prompter.size, offset: travelled.truncatingRemainder(dividingBy: max(height, 120)))
+                         size: prompter.size, offset: travelled.truncatingRemainder(dividingBy: max(height, 120)), light: prompter.light)
         }
         .frame(width: 560, height: 150)
-        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(.black))
+        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(prompter.light ? Color.white : Color.black))
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(alignment: .topLeading) {
-            Text("PREVIEW").font(Theme.caption(9, weight: .bold)).tracking(0.6).foregroundStyle(.white.opacity(0.4)).padding(10)
+            Text("PREVIEW").font(Theme.caption(9, weight: .bold)).tracking(0.6).foregroundStyle((prompter.light ? Color.black : Color.white).opacity(0.4)).padding(10)
         }
         .environment(\.colorScheme, .dark)
         .onChange(of: prompter.speed) { start = Date() }
@@ -157,6 +164,9 @@ struct TeleprompterView: View {
                 Label("Size", systemImage: "textformat.size").font(Theme.caption(11.5, weight: .semibold)).foregroundStyle(Theme.secondary)
                 Slider(value: $prompter.size, in: 14...40).frame(width: 110)
                 Text("\(Int(prompter.size)) pt").font(Theme.caption(10.5, weight: .medium)).monospacedDigit().foregroundStyle(Theme.tertiary)
+                Toggle("Light", isOn: $prompter.light).toggleStyle(.switch).controlSize(.mini)
+                    .font(Theme.caption(11.5, weight: .semibold)).foregroundStyle(Theme.secondary)
+                    .help("White background with dark text")
                 Spacer()
                 if prompter.isShowing {
                     PillButton(title: "Stop", icon: "stop.fill", tint: Theme.red, action: prompter.close)
