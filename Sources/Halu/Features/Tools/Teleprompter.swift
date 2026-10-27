@@ -10,6 +10,10 @@ final class Teleprompter: ObservableObject {
     @AppStorage("prompter.size") var size = 22.0
     /// White background with dark text, for reading in a bright room.
     @AppStorage("prompter.light") var light = false
+    /// How solid the panel's tint is over the blur (0.3 airy … 1 solid).
+    @AppStorage("prompter.opacity") var opacity = 0.75
+    @AppStorage("prompter.width") private var width = 600.0
+    @AppStorage("prompter.height") private var height = 170.0
     @Published private(set) var isShowing = false
     @Published var paused = false
     /// Points scrolled so far.
@@ -17,25 +21,30 @@ final class Teleprompter: ObservableObject {
 
     private var window: NSPanel?
     private var timer: Timer?
+    /// Room around the rounded panel for its shadow.
+    static let margin: CGFloat = 18
 
     func show() {
         guard !script.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         Services.shared.collapsePanel()
         let screen = NSScreen.main ?? NSScreen.screens[0]
-        let size = CGSize(width: 560, height: 150)
+        let size = CGSize(width: width + Self.margin * 2, height: height + Self.margin * 2)
         // Just under the menu bar, centred on the camera.
-        let frame = CGRect(x: screen.frame.midX - size.width / 2, y: screen.visibleFrame.maxY - size.height - 4, width: size.width, height: size.height)
+        let frame = CGRect(x: screen.frame.midX - size.width / 2, y: screen.visibleFrame.maxY - size.height + Self.margin - 4,
+                           width: size.width, height: size.height)
         let panel = NSPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.level = .statusBar
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = true
+        // The rounded panel draws its own shadow; the window's would be square.
+        panel.hasShadow = false
         panel.sharingType = .none
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        let host = NSHostingView(rootView: PrompterOverlay(prompter: self).frame(width: size.width, height: size.height))
+        let host = NSHostingView(rootView: PrompterOverlay(prompter: self))
         // The text is taller than the window; don't let it resize the window to fit.
         host.sizingOptions = []
         host.frame = CGRect(origin: .zero, size: size)
+        host.autoresizingMask = [.width, .height]
         panel.contentView = host
         panel.orderFrontRegardless()
         window = panel
@@ -52,6 +61,32 @@ final class Teleprompter: ObservableObject {
         self.timer = timer
     }
 
+    /// Where a drag started: the window's frame and the pointer, in screen coordinates. Following the
+    /// pointer on screen keeps the window steady even though the view moves with it.
+    private var dragStart: (frame: CGRect, mouse: CGPoint)?
+
+    enum Drag { case move, resize }
+
+    func drag(_ kind: Drag) {
+        guard let window else { return }
+        let mouse = NSEvent.mouseLocation
+        let start = dragStart ?? (window.frame, mouse)
+        dragStart = start
+        let dx = mouse.x - start.mouse.x, dy = mouse.y - start.mouse.y
+        switch kind {
+        case .move:
+            window.setFrameOrigin(CGPoint(x: start.frame.origin.x + dx, y: start.frame.origin.y + dy))
+        case .resize:
+            // Bottom-right corner: wider to the right, taller downwards; the top edge stays put.
+            let newWidth = max(320, start.frame.width + dx), newHeight = max(100, start.frame.height - dy)
+            window.setFrame(CGRect(x: start.frame.minX, y: start.frame.maxY - newHeight, width: newWidth, height: newHeight), display: true)
+            width = newWidth - Self.margin * 2
+            height = newHeight - Self.margin * 2
+        }
+    }
+
+    func endDrag() { dragStart = nil }
+
     func close() {
         timer?.invalidate()
         timer = nil
@@ -61,11 +96,13 @@ final class Teleprompter: ObservableObject {
     }
 }
 
+/// The floating panel: blurred and tinted, rounded, with controls on hover, draggable, and a corner grip to resize.
 private struct PrompterOverlay: View {
     @ObservedObject var prompter: Teleprompter
     @State private var hovering = false
 
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
         ZStack(alignment: .topTrailing) {
             PrompterText(script: prompter.script, size: prompter.size, offset: prompter.offset, light: prompter.light)
             if hovering {
@@ -77,15 +114,50 @@ private struct PrompterOverlay: View {
                     IconButton(icon: "xmark", help: "Close", size: 10, action: prompter.close)
                 }
                 .padding(6)
-                .background(Capsule().fill(.black.opacity(0.7)))
-                .padding(8)
+                .background(Capsule().fill(.black.opacity(0.55)))
+                .environment(\.colorScheme, .dark)
+                .padding(10)
+                .transition(.opacity)
             }
         }
-        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(prompter.light ? Color.white : Color.black))
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .onHover { hovering = $0 }
-        .environment(\.colorScheme, .dark)
+        .overlay(alignment: .bottomTrailing) {
+            if hovering {
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle((prompter.light ? Color.black : Color.white).opacity(0.5))
+                    .frame(width: 22, height: 22)
+                    .contentShape(Rectangle())
+                    .gesture(DragGesture().onChanged { _ in prompter.drag(.resize) }.onEnded { _ in prompter.endDrag() })
+                    .help("Drag to resize")
+                    .padding(6)
+            }
+        }
+        .background {
+            ZStack {
+                VisualBlur()
+                (prompter.light ? Color.white : Color.black).opacity(prompter.opacity)
+            }
+        }
+        .clipShape(shape)
+        .overlay(shape.strokeBorder((prompter.light ? Color.black : Color.white).opacity(0.12), lineWidth: 1))
+        .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
+        .padding(Teleprompter.margin)
+        .gesture(DragGesture().onChanged { _ in prompter.drag(.move) }.onEnded { _ in prompter.endDrag() })
+        .onHover { inside in withAnimation(.easeOut(duration: 0.15)) { hovering = inside } }
     }
+}
+
+/// The system's behind-window blur, like the Control Centre panels.
+private struct VisualBlur: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .hudWindow
+        view.blendingMode = .behindWindow
+        view.state = .active
+        return view
+    }
+
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {}
 }
 
 /// The script as it scrolls: full height (never cut to "…"), moved up by `offset`, fading at the edges.
@@ -128,8 +200,9 @@ private struct PrompterPreview: View {
                          size: prompter.size, offset: travelled.truncatingRemainder(dividingBy: max(height, 120)), light: prompter.light)
         }
         .frame(width: 560, height: 150)
-        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(prompter.light ? Color.white : Color.black))
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill((prompter.light ? Color.white : Color.black).opacity(prompter.opacity)))
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder((prompter.light ? Color.black : Color.white).opacity(0.12)))
         .overlay(alignment: .topLeading) {
             Text("PREVIEW").font(Theme.caption(9, weight: .bold)).tracking(0.6).foregroundStyle((prompter.light ? Color.black : Color.white).opacity(0.4)).padding(10)
         }
@@ -164,6 +237,8 @@ struct TeleprompterView: View {
                 Label("Size", systemImage: "textformat.size").font(Theme.caption(11.5, weight: .semibold)).foregroundStyle(Theme.secondary)
                 Slider(value: $prompter.size, in: 14...40).frame(width: 110)
                 Text("\(Int(prompter.size)) pt").font(Theme.caption(10.5, weight: .medium)).monospacedDigit().foregroundStyle(Theme.tertiary)
+                Label("Opacity", systemImage: "circle.lefthalf.filled").font(Theme.caption(11.5, weight: .semibold)).foregroundStyle(Theme.secondary)
+                Slider(value: $prompter.opacity, in: 0.3...1).frame(width: 90)
                 Toggle("Light", isOn: $prompter.light).toggleStyle(.switch).controlSize(.mini)
                     .font(Theme.caption(11.5, weight: .semibold)).foregroundStyle(Theme.secondary)
                     .help("White background with dark text")
