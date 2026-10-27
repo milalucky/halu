@@ -121,16 +121,15 @@ private struct PrompterOverlay: View {
             }
         }
         .overlay(alignment: .bottomTrailing) {
-            if hovering {
-                Image(systemName: "arrow.up.left.and.arrow.down.right")
+            // Always there, brighter on hover, so it's clear the panel can be resized.
+            Image(systemName: "arrow.up.left.and.arrow.down.right")
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle((prompter.light ? Color.black : Color.white).opacity(0.5))
+                    .foregroundStyle((prompter.light ? Color.black : Color.white).opacity(hovering ? 0.7 : 0.3))
                     .frame(width: 22, height: 22)
                     .contentShape(Rectangle())
                     .gesture(DragGesture().onChanged { _ in prompter.drag(.resize) }.onEnded { _ in prompter.endDrag() })
                     .help("Drag to resize")
                     .padding(6)
-            }
         }
         .background {
             ZStack {
@@ -158,6 +157,25 @@ private struct VisualBlur: NSViewRepresentable {
     }
 
     func updateNSView(_ view: NSVisualEffectView, context: Context) {}
+}
+
+/// A labelled slider with its value, laid out on one line.
+private struct SettingSlider: View {
+    let icon: String
+    let title: String
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    let readout: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Label(title, systemImage: icon).font(Theme.caption(11.5, weight: .semibold)).foregroundStyle(Theme.secondary)
+                .lineLimit(1).fixedSize()
+            Slider(value: $value, in: range).frame(minWidth: 90)
+            Text(readout).font(Theme.caption(10.5, weight: .medium)).monospacedDigit().foregroundStyle(Theme.tertiary)
+                .frame(width: 52, alignment: .leading)
+        }
+    }
 }
 
 /// The script as it scrolls: full height (never cut to "…"), moved up by `offset`, fading at the edges.
@@ -230,25 +248,30 @@ struct TeleprompterView: View {
             }
             .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.card))
             PrompterPreview(prompter: prompter).frame(maxWidth: .infinity)
-            HStack(spacing: 14) {
-                Label("Speed", systemImage: "speedometer").font(Theme.caption(11.5, weight: .semibold)).foregroundStyle(Theme.secondary)
-                Slider(value: $prompter.speed, in: 5...120).frame(width: 140)
-                Text("\(Int(prompter.speed)) pt/s").font(Theme.caption(10.5, weight: .medium)).monospacedDigit().foregroundStyle(Theme.tertiary)
-                Label("Size", systemImage: "textformat.size").font(Theme.caption(11.5, weight: .semibold)).foregroundStyle(Theme.secondary)
-                Slider(value: $prompter.size, in: 14...40).frame(width: 110)
-                Text("\(Int(prompter.size)) pt").font(Theme.caption(10.5, weight: .medium)).monospacedDigit().foregroundStyle(Theme.tertiary)
-                Label("Opacity", systemImage: "circle.lefthalf.filled").font(Theme.caption(11.5, weight: .semibold)).foregroundStyle(Theme.secondary)
-                Slider(value: $prompter.opacity, in: 0.3...1).frame(width: 90)
-                Toggle("Light", isOn: $prompter.light).toggleStyle(.switch).controlSize(.mini)
-                    .font(Theme.caption(11.5, weight: .semibold)).foregroundStyle(Theme.secondary)
-                    .help("White background with dark text")
-                Spacer()
-                if prompter.isShowing {
-                    PillButton(title: "Stop", icon: "stop.fill", tint: Theme.red, action: prompter.close)
-                } else {
-                    PillButton(title: "Start", icon: "play.fill", action: prompter.show)
-                        .disabled(prompter.script.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            HStack(spacing: 18) {
+                SettingSlider(icon: "speedometer", title: "Speed", value: $prompter.speed, range: 5...120, readout: "\(Int(prompter.speed)) pt/s")
+                SettingSlider(icon: "textformat.size", title: "Size", value: $prompter.size, range: 14...40, readout: "\(Int(prompter.size)) pt")
+            }
+            HStack(spacing: 18) {
+                SettingSlider(icon: "circle.lefthalf.filled", title: "Opacity", value: $prompter.opacity, range: 0.3...1,
+                              readout: "\(Int(prompter.opacity * 100))%")
+                Toggle(isOn: $prompter.light) {
+                    Text("Light").font(Theme.caption(11.5, weight: .semibold)).foregroundStyle(Theme.secondary)
                 }
+                .toggleStyle(.switch).controlSize(.mini).fixedSize()
+                .help("White background with dark text")
+                Spacer()
+                Text("Drag the panel to move it, its corner to resize")
+                    .font(Theme.caption(10.5, weight: .regular)).foregroundStyle(Theme.tertiary).lineLimit(1)
+                Group {
+                    if prompter.isShowing {
+                        PillButton(title: "Stop", icon: "stop.fill", tint: Theme.red, action: prompter.close)
+                    } else {
+                        PillButton(title: "Start", icon: "play.fill", action: prompter.show)
+                            .disabled(prompter.script.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                }
+                .fixedSize()
             }
         }
     }
