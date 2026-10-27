@@ -61,20 +61,7 @@ private struct PrompterOverlay: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            Text(prompter.script)
-                .font(.system(size: prompter.size, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 24)
-                .padding(.top, 60)
-                .offset(y: -prompter.offset)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .clipped()
-                // Fade in and out at the edges, so lines appear and leave softly.
-                .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.25),
-                                             .init(color: .black, location: 0.75), .init(color: .clear, location: 1)],
-                                     startPoint: .top, endPoint: .bottom))
+            PrompterText(script: prompter.script, size: prompter.size, offset: prompter.offset)
             if hovering {
                 HStack(spacing: 4) {
                     IconButton(icon: "minus", help: "Slower", size: 10) { prompter.speed = max(5, prompter.speed - 5) }
@@ -92,6 +79,55 @@ private struct PrompterOverlay: View {
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .onHover { hovering = $0 }
         .environment(\.colorScheme, .dark)
+    }
+}
+
+/// The script as it scrolls: full height (never cut to "…"), moved up by `offset`, fading at the edges.
+struct PrompterText: View {
+    let script: String
+    let size: Double
+    let offset: CGFloat
+
+    var body: some View {
+        Text(script)
+            .font(.system(size: size, weight: .semibold, design: .rounded))
+            .foregroundStyle(.white)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 24)
+            .padding(.top, 60)
+            .offset(y: -offset)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .clipped()
+            .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.25),
+                                         .init(color: .black, location: 0.75), .init(color: .clear, location: 1)],
+                                 startPoint: .top, endPoint: .bottom))
+    }
+}
+
+/// The overlay in miniature, looping at the chosen size and speed, so the sliders show what they do.
+private struct PrompterPreview: View {
+    @ObservedObject var prompter: Teleprompter
+    @State private var start = Date()
+
+    var body: some View {
+        TimelineView(.animation) { context in
+            // Loop once the text has scrolled past (its height estimated for the 560 pt window).
+            let height = (prompter.script as NSString).boundingRect(
+                with: CGSize(width: 512, height: CGFloat.greatestFiniteMagnitude), options: .usesLineFragmentOrigin,
+                attributes: [.font: NSFont.systemFont(ofSize: prompter.size, weight: .semibold)]).height + 60
+            let travelled = CGFloat(context.date.timeIntervalSince(start) * prompter.speed)
+            PrompterText(script: prompter.script.isEmpty ? "Your text scrolls here, at this size and speed." : prompter.script,
+                         size: prompter.size, offset: travelled.truncatingRemainder(dividingBy: max(height, 120)))
+        }
+        .frame(width: 560, height: 150)
+        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(.black))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(alignment: .topLeading) {
+            Text("PREVIEW").font(Theme.caption(9, weight: .bold)).tracking(0.6).foregroundStyle(.white.opacity(0.4)).padding(10)
+        }
+        .environment(\.colorScheme, .dark)
+        .onChange(of: prompter.speed) { start = Date() }
     }
 }
 
@@ -113,11 +149,14 @@ struct TeleprompterView: View {
                 }
             }
             .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.card))
+            PrompterPreview(prompter: prompter).frame(maxWidth: .infinity)
             HStack(spacing: 14) {
                 Label("Speed", systemImage: "speedometer").font(Theme.caption(11.5, weight: .semibold)).foregroundStyle(Theme.secondary)
                 Slider(value: $prompter.speed, in: 5...120).frame(width: 140)
+                Text("\(Int(prompter.speed)) pt/s").font(Theme.caption(10.5, weight: .medium)).monospacedDigit().foregroundStyle(Theme.tertiary)
                 Label("Size", systemImage: "textformat.size").font(Theme.caption(11.5, weight: .semibold)).foregroundStyle(Theme.secondary)
                 Slider(value: $prompter.size, in: 14...40).frame(width: 110)
+                Text("\(Int(prompter.size)) pt").font(Theme.caption(10.5, weight: .medium)).monospacedDigit().foregroundStyle(Theme.tertiary)
                 Spacer()
                 if prompter.isShowing {
                     PillButton(title: "Stop", icon: "stop.fill", tint: Theme.red, action: prompter.close)
