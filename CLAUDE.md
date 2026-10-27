@@ -65,6 +65,12 @@ Recordly (dev.recordly.app, Electron): it has no URL scheme, AppleScript or glob
 
 Google Meet join links get `authuser=<email>` (CalendarStore.meetLink) so the call opens in the right Google account: the email from Settings → Google Meet ("meet.account"), else the meeting calendar's account.
 
+19. Habits — yes/no habits and counters with a daily goal (habits.json), ring per habit, streaks, last 7 days.
+20. Stands (Tab.environments; model `Stand`, not `Environment` — that name is SwiftUI's) — user-added test stands: name, URL, account from Accounts; Open opens the URL and copies the login; password copy is concealed.
+21. Shortcuts — the user's macOS Shortcuts via /usr/bin/shortcuts (list/run), pinned first.
+22. System — CPU (host_statistics), memory used (vm_statistics64), disk, battery (IOKit.ps), top 6 processes (ps); sampled only while the tab is open.
+Tools → Teleprompter: script scrolls in a panel under the camera, hidden from screen sharing (sharingType = .none).
+
 Tabs are configurable in Settings (gear): all on by default; a disabled tab hides from the sidebar, pauses its store's background work (`isActive`), and drops its notch indicators.
 
 ## Roadmap

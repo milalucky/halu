@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 enum Tab: String, CaseIterable, Identifiable {
-    case tasks, calendar, finance, claude, chat, weather, jira, gitlab, messages, clipboard, translate, tools, accounts, notes, media, settings
+    case tasks, calendar, habits, finance, claude, chat, weather, jira, gitlab, messages, clipboard, translate, tools, environments, shortcuts, system, accounts, notes, media, settings
 
     var id: String { rawValue }
 
@@ -13,6 +13,10 @@ enum Tab: String, CaseIterable, Identifiable {
         case .claude: "Claude"
         case .chat: "Chat"
         case .finance: "Money"
+        case .habits: "Habits"
+        case .environments: "Stands"
+        case .shortcuts: "Shortcuts"
+        case .system: "System"
         case .weather: "Weather"
         case .clipboard: "Clipboard"
         case .translate: "Translate"
@@ -34,6 +38,10 @@ enum Tab: String, CaseIterable, Identifiable {
         case .claude: "sparkle"
         case .chat: "bubble.left.circle"
         case .finance: "creditcard"
+        case .habits: "repeat.circle"
+        case .environments: "server.rack"
+        case .shortcuts: "square.stack.3d.up"
+        case .system: "gauge.with.dots.needle.33percent"
         case .weather: "cloud.sun"
         case .clipboard: "doc.on.clipboard"
         case .translate: "character.bubble"
@@ -181,6 +189,11 @@ final class Services {
     let market = MarketStore()
     let finance = FinanceStore()
     let recordly = RecordlyBridge()
+    let habits = HabitStore()
+    let stands = EnvironmentStore()
+    let shortcuts = ShortcutsStore()
+    let system = SystemMonitor()
+    let teleprompter = Teleprompter()
     let gitlab = GitLabStore()
     /// Opens Halu as a normal window that stays open; set by the app delegate.
     var openWindow: () -> Void = {}
