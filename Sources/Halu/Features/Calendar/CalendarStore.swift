@@ -60,7 +60,11 @@ final class CalendarStore: ObservableObject {
         let timer = Timer(timeInterval: 5, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                if Int(Date().timeIntervalSince1970) % 300 < 5 { self.reload() }
+                // Ask the accounts (Google) to sync each minute; whatever changed arrives as EKEventStoreChanged.
+                if Int(Date().timeIntervalSince1970) % 60 < 5 {
+                    self.store.refreshSourcesIfNecessary()
+                    self.reload()
+                }
                 self.checkReminders()
             }
         }
