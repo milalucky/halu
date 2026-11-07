@@ -6,16 +6,22 @@ import SwiftUI
 ///   coloured icons, bouncy motion.
 /// - Neon: blue-black, electric colours, a shimmering gradient rim and glowing highlights.
 /// - Glass: dark Liquid Glass you can see the desktop through, with the tab colours.
+/// - Aurora (default): Liquid Glass with soft colour light, a floating glass capsule for the tabs
+///   and frosted cards.
 enum Style: String, CaseIterable, Identifiable {
-    case minimal = "Minimal", playful = "Playful", neon = "Neon", glass = "Glass"
+    case aurora = "Aurora", minimal = "Minimal", playful = "Playful", neon = "Neon", glass = "Glass"
     var id: String { rawValue }
 
     /// The theme in use; read while drawing. AppModel keeps it current.
     static var current: Style = {
-        let saved = UserDefaults.standard.string(forKey: "style") ?? ""
-        // The old Dark Glass appearance setting becomes the Glass theme.
-        if UserDefaults.standard.string(forKey: "appearance") == "Dark Glass" { return .glass }
-        return Style(rawValue: saved) ?? .playful
+        let defaults = UserDefaults.standard
+        // Aurora is the new look: switch to it once; picking another theme afterwards sticks.
+        if !defaults.bool(forKey: "style.auroraIntroduced") {
+            defaults.set(true, forKey: "style.auroraIntroduced")
+            defaults.set(Style.aurora.rawValue, forKey: "style")
+            return .aurora
+        }
+        return Style(rawValue: defaults.string(forKey: "style") ?? "") ?? .aurora
     }()
 
     var glows: Bool { self == .neon }
@@ -27,6 +33,7 @@ enum Style: String, CaseIterable, Identifiable {
         case .playful: "paintpalette.fill"
         case .neon: "sparkles"
         case .glass: "drop.fill"
+        case .aurora: "sparkles.rectangle.stack"
         }
     }
 
@@ -36,12 +43,14 @@ enum Style: String, CaseIterable, Identifiable {
         case .playful: "A soft colour for every tab"
         case .neon: "Electric colours that glow"
         case .glass: "Liquid Glass over your desktop"
+        case .aurora: "Glass with soft colour light"
         }
     }
 
     func color(for tab: Tab) -> Color {
         let hue: (Double, Double, Double)
         switch tab {
+        case .today: hue = (1.00, 0.80, 0.45)
         case .tasks: hue = (0.70, 0.64, 1.00)
         case .finance: hue = (0.35, 0.88, 0.55)
         case .habits: hue = (1.00, 0.70, 0.30)
@@ -66,7 +75,7 @@ enum Style: String, CaseIterable, Identifiable {
         switch self {
         case .minimal:
             return Color(white: 0.88)
-        case .playful, .glass:
+        case .playful, .glass, .aurora:
             // Soft: pulled towards white.
             return Color(red: hue.0 * 0.8 + 0.2, green: hue.1 * 0.8 + 0.2, blue: hue.2 * 0.8 + 0.2)
         case .neon:

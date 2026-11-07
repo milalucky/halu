@@ -17,6 +17,7 @@ enum Theme {
         switch Style.current {
         case .playful: accent.opacity(0.1)
         case .neon: accent.opacity(0.07)
+        case .aurora: Color.white.opacity(0.07)
         default: Color.white.opacity(0.055)
         }
     }
@@ -25,6 +26,7 @@ enum Theme {
         switch Style.current {
         case .playful: accent.opacity(0.17)
         case .neon: accent.opacity(0.13)
+        case .aurora: Color.white.opacity(0.12)
         default: Color.white.opacity(0.095)
         }
     }

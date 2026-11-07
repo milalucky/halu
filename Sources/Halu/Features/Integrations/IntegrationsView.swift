@@ -185,6 +185,7 @@ private struct ThemeCard: View {
         case .playful: AnyShapeStyle(RadialGradient(colors: [style.color(for: .tasks).opacity(0.45), .black], center: .topLeading, startRadius: 0, endRadius: 120))
         case .neon: AnyShapeStyle(LinearGradient(colors: [Color(red: 0.06, green: 0.03, blue: 0.16), .black], startPoint: .top, endPoint: .bottom))
         case .glass: AnyShapeStyle(LinearGradient(colors: [Color.white.opacity(0.18), Color.white.opacity(0.05)], startPoint: .topLeading, endPoint: .bottomTrailing))
+        case .aurora: AnyShapeStyle(LinearGradient(colors: [Color(red: 0.11, green: 0.56, blue: 0.53).opacity(0.7), Color(red: 0.17, green: 0.36, blue: 0.85).opacity(0.5), Color(red: 0.76, green: 0.28, blue: 0.49).opacity(0.5)], startPoint: .topLeading, endPoint: .bottomTrailing))
         }
     }
 }

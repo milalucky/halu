@@ -2,12 +2,13 @@ import AppKit
 import SwiftUI
 
 enum Tab: String, CaseIterable, Identifiable {
-    case tasks, calendar, habits, finance, claude, chat, weather, jira, gitlab, messages, clipboard, translate, tools, environments, shortcuts, system, accounts, notes, media, settings
+    case today, tasks, calendar, habits, finance, claude, chat, weather, jira, gitlab, messages, clipboard, translate, tools, environments, shortcuts, system, accounts, notes, media, settings
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
+        case .today: "Today"
         case .tasks: "Tasks"
         case .calendar: "Calendar"
         case .claude: "Claude"
@@ -33,6 +34,7 @@ enum Tab: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
+        case .today: "square.grid.2x2"
         case .tasks: "checklist"
         case .calendar: "calendar"
         case .claude: "sparkle"
@@ -122,6 +124,11 @@ final class AppModel: ObservableObject {
         disabledTabs = Set((UserDefaults.standard.stringArray(forKey: "disabledTabs") ?? []).compactMap(Tab.init(rawValue:)))
         let arranged = (UserDefaults.standard.stringArray(forKey: "tabOrder") ?? []).compactMap(Tab.init(rawValue:)).filter(Self.configurable.contains)
         order = arranged + Self.configurable.filter { !arranged.contains($0) }
+        // Today is the home tab: it goes to the top of an order arranged before it existed.
+        if !arranged.isEmpty, !arranged.contains(.today) {
+            order.removeAll { $0 == .today }
+            order.insert(.today, at: 0)
+        }
         Theme.accent = Style.current.color(for: tab)
         Layout.expandedWidth = panelSize.size.width
         Layout.contentHeight = panelSize.size.height
