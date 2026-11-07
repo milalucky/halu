@@ -1,8 +1,10 @@
+import AppKit
 import SwiftUI
 
 /// The tiles Today can show.
 enum TodayTile: String, CaseIterable, Codable, Identifiable {
     case meeting, claude, tasks, focus, messages, habits, media
+    case weather, system, gitlab, jira, clipboard, notes, money, stands, shortcuts, translate
     var id: String { rawValue }
 
     /// The tab the tile comes from; it is left out while that tab is off in Settings.
@@ -15,6 +17,16 @@ enum TodayTile: String, CaseIterable, Codable, Identifiable {
         case .habits: .habits
         case .media: .media
         case .focus: nil
+        case .weather: .weather
+        case .system: .system
+        case .gitlab: .gitlab
+        case .jira: .jira
+        case .clipboard: .clipboard
+        case .notes: .notes
+        case .money: .finance
+        case .stands: .environments
+        case .shortcuts: .shortcuts
+        case .translate: .translate
         }
     }
 
@@ -32,18 +44,55 @@ enum TodayTile: String, CaseIterable, Codable, Identifiable {
 /// Which tiles Today shows, in what order and how wide; kept in UserDefaults ("today.layout").
 @MainActor
 final class TodayLayout: ObservableObject {
+    enum Size: String, Codable, CaseIterable {
+        case small, medium, large
+        /// Share of a row, out of four.
+        var units: Int { self == .small ? 1 : self == .medium ? 2 : 4 }
+        var title: String { rawValue.capitalized }
+    }
+
     struct Slot: Codable, Equatable, Identifiable {
         var tile: TodayTile
-        var wide: Bool
+        var size: Size
         var shown = true
         var id: TodayTile { tile }
+
+        init(tile: TodayTile, size: Size, shown: Bool = true) {
+            self.tile = tile
+            self.size = size
+            self.shown = shown
+        }
+
+        // Layouts saved before sizes had a Small/Wide switch: Wide becomes Medium.
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: Keys.self)
+            tile = try container.decode(TodayTile.self, forKey: .tile)
+            shown = try container.decodeIfPresent(Bool.self, forKey: .shown) ?? true
+            size = try container.decodeIfPresent(Size.self, forKey: .size)
+                ?? ((try container.decodeIfPresent(Bool.self, forKey: .wide)) == true ? .medium : .small)
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: Keys.self)
+            try container.encode(tile, forKey: .tile)
+            try container.encode(size, forKey: .size)
+            try container.encode(shown, forKey: .shown)
+        }
+
+        private enum Keys: String, CodingKey { case tile, size, shown, wide }
     }
 
     static let shared = TodayLayout()
     static let standard: [Slot] = [
-        Slot(tile: .meeting, wide: true), Slot(tile: .claude, wide: false), Slot(tile: .tasks, wide: false),
-        Slot(tile: .messages, wide: true), Slot(tile: .habits, wide: false), Slot(tile: .focus, wide: false),
-        Slot(tile: .media, wide: true),
+        Slot(tile: .meeting, size: .medium), Slot(tile: .claude, size: .small), Slot(tile: .tasks, size: .small),
+        Slot(tile: .messages, size: .medium), Slot(tile: .habits, size: .small), Slot(tile: .focus, size: .small),
+        Slot(tile: .media, size: .medium),
+        // The rest start hidden; Customize turns them on.
+        Slot(tile: .weather, size: .small, shown: false), Slot(tile: .system, size: .medium, shown: false),
+        Slot(tile: .gitlab, size: .medium, shown: false), Slot(tile: .jira, size: .medium, shown: false),
+        Slot(tile: .clipboard, size: .medium, shown: false), Slot(tile: .notes, size: .small, shown: false),
+        Slot(tile: .money, size: .small, shown: false), Slot(tile: .stands, size: .small, shown: false),
+        Slot(tile: .shortcuts, size: .small, shown: false), Slot(tile: .translate, size: .medium, shown: false),
     ]
 
     @Published var slots: [Slot] { didSet { save() } }
@@ -94,11 +143,11 @@ struct TodayView: View {
                     ScrollView(.vertical) {
                         VStack(spacing: 10) {
                             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                                let units = row.reduce(0) { $0 + ($1.wide ? 2 : 1) }
+                                let units = row.reduce(0) { $0 + $1.size.units }
                                 let unit = (proxy.size.width - CGFloat(row.count - 1) * 10) / CGFloat(units)
                                 HStack(alignment: .top, spacing: 10) {
                                     ForEach(row) { slot in
-                                        tile(slot.tile).frame(width: unit * (slot.wide ? 2 : 1))
+                                        tile(slot.tile).frame(width: unit * CGFloat(slot.size.units))
                                     }
                                 }
                                 .fixedSize(horizontal: false, vertical: true)
@@ -115,7 +164,7 @@ struct TodayView: View {
     private var rows: [[TodayLayout.Slot]] {
         var rows: [[TodayLayout.Slot]] = [], row: [TodayLayout.Slot] = [], used = 0
         for slot in layout.slots where slot.shown && (slot.tile.tab.map(model.isEnabled) ?? true) {
-            let width = slot.wide ? 2 : 1
+            let width = slot.size.units
             if used + width > 4 { rows.append(row); row = []; used = 0 }
             row.append(slot)
             used += width
@@ -134,6 +183,16 @@ struct TodayView: View {
         case .habits: HabitsTile(store: services.habits) { open(.habits) }
         case .media: MediaTile(store: services.media) { open(.media) }
         case .focus: FocusTile(pomodoro: services.pomodoro)
+        case .weather: WeatherTile(store: services.weather) { open(.weather) }
+        case .system: SystemTile(monitor: services.system) { open(.system) }
+        case .gitlab: GitLabTile(store: services.gitlab) { open(.gitlab) }
+        case .jira: JiraTile(store: services.jira) { open(.jira) }
+        case .clipboard: ClipboardTile(store: services.clipboard) { open(.clipboard) }
+        case .notes: NotesTile(store: services.notes) { open(.notes) }
+        case .money: MoneyTile(store: services.finance) { open(.finance) }
+        case .stands: StandsTile(store: services.stands, accounts: services.accounts) { open(.environments) }
+        case .shortcuts: ShortcutsTile(store: services.shortcuts) { open(.shortcuts) }
+        case .translate: TranslateTile(store: services.translate) { open(.translate) }
         }
     }
 
@@ -154,11 +213,10 @@ struct TodayView: View {
                             Text("tab is off").font(Theme.caption(11, weight: .regular)).foregroundStyle(Theme.tertiary)
                         }
                         Spacer()
-                        Picker("", selection: Binding(get: { slot.wide }, set: { layout.slots[index].wide = $0 })) {
-                            Text("Small").tag(false)
-                            Text("Wide").tag(true)
+                        Picker("", selection: Binding(get: { slot.size }, set: { layout.slots[index].size = $0 })) {
+                            ForEach(TodayLayout.Size.allCases, id: \.self) { Text($0.title).tag($0) }
                         }
-                        .pickerStyle(.segmented).labelsHidden().frame(width: 120)
+                        .pickerStyle(.segmented).labelsHidden().frame(width: 190)
                         IconButton(icon: "chevron.up", help: "Move up") { layout.move(slot, by: -1) }
                             .opacity(index == 0 ? 0.3 : 1)
                         IconButton(icon: "chevron.down", help: "Move down") { layout.move(slot, by: 1) }
@@ -454,6 +512,251 @@ private struct HabitsTile: View {
                     .buttonStyle(.plain)
                     .help("\(habit.name): \(count)/\(habit.goal) · click to add one")
                 }
+            }
+        }
+    }
+}
+
+// MARK: - More tiles
+
+/// A tile's list line: an optional colour mark, the text, and an optional trailing detail.
+private struct TileRow: View {
+    let text: String
+    var detail: String?
+    var mark: Color?
+    var action: (() -> Void)?
+
+    var body: some View {
+        let line = HStack(spacing: 7) {
+            if let mark { RoundedRectangle(cornerRadius: 1.5).fill(mark).frame(width: 3, height: 13) }
+            Text(text).font(Theme.caption(12, weight: .regular)).foregroundStyle(Theme.primary).lineLimit(1)
+            Spacer(minLength: 4)
+            if let detail { Text(detail).font(Theme.caption(11, weight: .medium)).foregroundStyle(Theme.tertiary).lineLimit(1) }
+        }
+        .contentShape(Rectangle())
+        if let action {
+            Button(action: action) { line }.buttonStyle(.plain)
+        } else {
+            line
+        }
+    }
+}
+
+private struct Quiet: View {
+    let text: String
+    var body: some View { Text(text).font(Theme.caption(12, weight: .regular)).foregroundStyle(Theme.secondary) }
+}
+
+private struct WeatherTile: View {
+    @ObservedObject var store: WeatherStore
+    let open: () -> Void
+
+    var body: some View {
+        Tile(tab: .weather, label: store.place.isEmpty ? "Weather" : store.place, open: open) {
+            if let now = store.now {
+                let sky = WeatherStore.describe(now.code, day: now.isDay)
+                HStack(spacing: 8) {
+                    Image(systemName: sky.symbol).symbolRenderingMode(.multicolor).font(.system(size: 22))
+                    BigNumber(value: "\(Int(now.temperature.rounded()))°")
+                }
+                Quiet(text: sky.text + (now.high.map { h in now.low.map { " · \(Int(h.rounded()))° / \(Int($0.rounded()))°" } ?? "" } ?? ""))
+                    .lineLimit(1)
+            } else {
+                Quiet(text: store.problem ?? "Loading…")
+            }
+        }
+    }
+}
+
+private struct SystemTile: View {
+    @ObservedObject var monitor: SystemMonitor
+    let open: () -> Void
+
+    var body: some View {
+        Tile(tab: .system, open: open) {
+            HStack(spacing: 14) {
+                ring("CPU", monitor.cpu, Theme.accent)
+                ring("RAM", monitor.memoryUsed / max(monitor.memoryTotal, 1), Theme.blue)
+                if let battery = monitor.battery {
+                    ring(battery.charging ? "Charging" : "Battery", Double(battery.level) / 100,
+                         battery.level <= 20 && !battery.charging ? Theme.red : Theme.green)
+                }
+            }
+        }
+        // Sampled only while on screen, like the System tab.
+        .onAppear(perform: monitor.start)
+        .onDisappear(perform: monitor.stop)
+    }
+
+    private func ring(_ title: String, _ value: Double, _ tint: Color) -> some View {
+        VStack(spacing: 4) {
+            ZStack {
+                Circle().stroke(Color.white.opacity(0.1), lineWidth: 4)
+                Circle().trim(from: 0, to: min(1, max(0, value)))
+                    .stroke(tint, style: StrokeStyle(lineWidth: 4, lineCap: .round)).rotationEffect(.degrees(-90))
+                Text("\(Int(value * 100))").font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Theme.primary)
+            }
+            .frame(width: 38, height: 38)
+            Text(title).font(Theme.caption(10, weight: .semibold)).foregroundStyle(Theme.tertiary)
+        }
+    }
+}
+
+private struct GitLabTile: View {
+    @ObservedObject var store: GitLabStore
+    let open: () -> Void
+
+    var body: some View {
+        let review = store.requests.filter { $0.role == .review }.count
+        Tile(tab: .gitlab, open: open) {
+            if store.requests.isEmpty {
+                Quiet(text: store.server.isEmpty ? "Not connected" : "No open merge requests")
+            } else {
+                BigNumber(value: "\(review)", unit: "to review")
+                ForEach(store.requests.prefix(3)) { request in
+                    TileRow(text: request.title, detail: request.reference,
+                            mark: request.pipeline.map { $0 == .failed ? Theme.red : $0 == .success ? Theme.green : Theme.orange }) {
+                        store.open(request)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct JiraTile: View {
+    @ObservedObject var store: JiraStore
+    let open: () -> Void
+
+    var body: some View {
+        Tile(tab: .jira, open: open) {
+            if store.issues.isEmpty {
+                Quiet(text: store.site.isEmpty ? "Not connected" : "No issues")
+            } else {
+                BigNumber(value: "\(store.issues.filter { $0.category != .done }.count)", unit: "open")
+                ForEach(store.issues.prefix(3)) { issue in
+                    TileRow(text: issue.summary, detail: issue.key,
+                            mark: issue.category == .inProgress ? Theme.blue : issue.category == .done ? Theme.green : Theme.tertiary) {
+                        NSWorkspace.shared.open(issue.url)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct ClipboardTile: View {
+    @ObservedObject var store: ClipboardStore
+    let open: () -> Void
+
+    var body: some View {
+        Tile(tab: .clipboard, open: open) {
+            if store.history.isEmpty { Quiet(text: "Nothing copied yet") }
+            ForEach(store.history.prefix(4)) { entry in
+                TileRow(text: entry.text.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "\n", with: " "),
+                        detail: Fmt.ago(entry.copiedAt)) { store.copy(entry.text) }
+                    .help("Copy again")
+            }
+        }
+    }
+}
+
+private struct NotesTile: View {
+    @ObservedObject var store: NotesStore
+    let open: () -> Void
+
+    var body: some View {
+        Tile(tab: .notes, open: open) {
+            if store.notes.isEmpty { Quiet(text: "No notes") }
+            ForEach(store.notes.prefix(4)) { note in
+                TileRow(text: note.title.isEmpty ? "Untitled" : note.title) {
+                    store.select(note.id)
+                    open()
+                }
+            }
+        }
+        .onAppear { if store.notes.isEmpty { store.refresh() } }
+    }
+}
+
+private struct MoneyTile: View {
+    @ObservedObject var store: FinanceStore
+    let open: () -> Void
+
+    var body: some View {
+        Tile(tab: .finance, label: "Money · this month", open: open) {
+            BigNumber(value: Money.format(store.spent, store.currency))
+            Quiet(text: "spent · \(Money.format(store.earned, store.currency)) in").lineLimit(1)
+        }
+    }
+}
+
+private struct StandsTile: View {
+    @ObservedObject var store: EnvironmentStore
+    @ObservedObject var accounts: AccountStore
+    let open: () -> Void
+
+    var body: some View {
+        Tile(tab: .environments, open: open) {
+            if store.items.isEmpty { Quiet(text: "No stands yet") }
+            ForEach(store.items.prefix(4)) { stand in
+                TileRow(text: stand.name, detail: "Open") {
+                    let account = stand.accountID.flatMap { id in accounts.accounts.first { $0.id == id } }
+                    store.open(stand, account: account, accounts: accounts)
+                }
+                .help("Open the stand and copy its login")
+            }
+        }
+    }
+}
+
+private struct ShortcutsTile: View {
+    @ObservedObject var store: ShortcutsStore
+    let open: () -> Void
+
+    var body: some View {
+        Tile(tab: .shortcuts, open: open) {
+            let list = store.pinned.isEmpty ? Array(store.names.prefix(4)) : Array(store.pinned.prefix(4))
+            if list.isEmpty { Quiet(text: "No shortcuts") }
+            ForEach(list, id: \.self) { name in
+                TileRow(text: name, detail: state(name)) { store.run(name) }
+                    .help("Run")
+            }
+        }
+        .onAppear { if store.names.isEmpty { store.load() } }
+    }
+
+    private func state(_ name: String) -> String {
+        switch store.states[name] {
+        case .running: "Running…"
+        case .done: "Done"
+        case .failed: "Failed"
+        case nil: "Run"
+        }
+    }
+}
+
+private struct TranslateTile: View {
+    @ObservedObject var store: TranslateStore
+    let open: () -> Void
+
+    var body: some View {
+        Tile(tab: .translate, open: open) {
+            TextField("Type to translate", text: $store.input)
+                .textFieldStyle(.plain)
+                .font(Theme.body(13))
+                .padding(.horizontal, 10).padding(.vertical, 7)
+                .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Color.white.opacity(0.06)))
+            if !store.output.isEmpty {
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(store.output, forType: .string)
+                } label: {
+                    Text(store.output).font(Theme.body(13)).foregroundStyle(Theme.primary).lineLimit(3)
+                        .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Copy the translation")
             }
         }
     }
