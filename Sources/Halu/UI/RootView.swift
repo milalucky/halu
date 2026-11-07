@@ -32,7 +32,9 @@ struct RootView: View {
         let lifted = display == .expanded || display == .notice || display == .request
 
         ZStack(alignment: .top) {
-            PanelBackground(shape: shape, style: model.style, open: lifted, headerHeight: Layout.headerHeight(state.geometry))
+            // Notices and the Claude card stay solid black in the glass themes, so they melt into the notch.
+            PanelBackground(shape: shape, style: display != .expanded && (model.style == .aurora || model.style == .glass) ? .minimal : model.style,
+                            open: lifted, headerHeight: Layout.headerHeight(state.geometry))
                 .shadow(color: .black.opacity(lifted ? 0.55 : 0), radius: 22, y: 10)
             if lifted && model.style.glows {
                 NeonRim(shape: shape)
