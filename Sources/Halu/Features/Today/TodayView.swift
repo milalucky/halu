@@ -122,6 +122,7 @@ struct TodayView: View {
     let services: Services
     @ObservedObject private var layout = TodayLayout.shared
     @State private var customizing = false
+    @State private var previewHeight: CGFloat = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -137,25 +138,46 @@ struct TodayView: View {
                 }
             }
             if customizing {
-                editor
-            } else {
+                // The list on the left, a live, scaled-down Today on the right: changes show as you make them.
                 GeometryReader { proxy in
-                    ScrollView(.vertical) {
-                        VStack(spacing: 10) {
-                            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                                let units = row.reduce(0) { $0 + $1.size.units }
-                                let unit = (proxy.size.width - CGFloat(row.count - 1) * 10) / CGFloat(units)
-                                HStack(alignment: .top, spacing: 10) {
-                                    ForEach(row) { slot in
-                                        tile(slot.tile).frame(width: unit * CGFloat(slot.size.units))
-                                    }
-                                }
-                                .fixedSize(horizontal: false, vertical: true)
+                    let listWidth: CGFloat = 300
+                    let previewWidth = proxy.size.width - listWidth - 14
+                    HStack(alignment: .top, spacing: 14) {
+                        editor.frame(width: listWidth)
+                        VStack(alignment: .leading, spacing: 6) {
+                            SmallCaps("Preview")
+                            ScrollView(.vertical) {
+                                grid(width: proxy.size.width)
+                                    .frame(width: proxy.size.width)
+                                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { previewHeight = $0 }
+                                    .scaleEffect(previewWidth / proxy.size.width, anchor: .topLeading)
+                                    .frame(width: previewWidth, height: previewHeight * previewWidth / proxy.size.width, alignment: .topLeading)
+                                    .allowsHitTesting(false)
                             }
+                            .scrollIndicators(.never)
                         }
                     }
-                    .scrollIndicators(.never)
                 }
+            } else {
+                GeometryReader { proxy in
+                    ScrollView(.vertical) { grid(width: proxy.size.width) }
+                        .scrollIndicators(.never)
+                }
+            }
+        }
+    }
+
+    private func grid(width: CGFloat) -> some View {
+        VStack(spacing: 10) {
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                let units = row.reduce(0) { $0 + $1.size.units }
+                let unit = (width - CGFloat(row.count - 1) * 10) / CGFloat(units)
+                HStack(alignment: .top, spacing: 10) {
+                    ForEach(row) { slot in
+                        tile(slot.tile).frame(width: unit * CGFloat(slot.size.units))
+                    }
+                }
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -202,29 +224,30 @@ struct TodayView: View {
                 ForEach(layout.slots) { slot in
                     let index = layout.slots.firstIndex(of: slot) ?? 0
                     let off = slot.tile.tab.map { !model.isEnabled($0) } ?? false
-                    HStack(spacing: 10) {
+                    HStack(spacing: 7) {
                         Toggle("", isOn: Binding(get: { slot.shown }, set: { layout.slots[index].shown = $0 }))
                             .toggleStyle(.checkbox).labelsHidden()
                         Image(systemName: slot.tile.icon).font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(Style.current.color(for: slot.tile.tab ?? .habits))
                             .frame(width: 18)
-                        Text(slot.tile.title).font(Theme.body(13)).foregroundStyle(slot.shown ? Theme.primary : Theme.tertiary)
-                        if off {
-                            Text("tab is off").font(Theme.caption(11, weight: .regular)).foregroundStyle(Theme.tertiary)
-                        }
-                        Spacer()
+                        Text(slot.tile.title).font(Theme.body(12.5)).foregroundStyle(slot.shown ? Theme.primary : Theme.tertiary)
+                            .lineLimit(1)
+                            .help(off ? "Its tab is off in Settings" : slot.tile.title)
+                        Spacer(minLength: 2)
                         Picker("", selection: Binding(get: { slot.size }, set: { layout.slots[index].size = $0 })) {
-                            ForEach(TodayLayout.Size.allCases, id: \.self) { Text($0.title).tag($0) }
+                            ForEach(TodayLayout.Size.allCases, id: \.self) { Text($0.title.prefix(1)).tag($0).help($0.title) }
                         }
-                        .pickerStyle(.segmented).labelsHidden().frame(width: 190)
+                        .pickerStyle(.segmented).labelsHidden().frame(width: 84)
+                        .help("Small, Medium or Large: a quarter, half or the whole row")
                         IconButton(icon: "chevron.up", help: "Move up") { layout.move(slot, by: -1) }
                             .opacity(index == 0 ? 0.3 : 1)
                         IconButton(icon: "chevron.down", help: "Move down") { layout.move(slot, by: 1) }
                             .opacity(index == layout.slots.count - 1 ? 0.3 : 1)
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
                     .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.card))
+                    .opacity(off ? 0.5 : 1)
                 }
             }
         }

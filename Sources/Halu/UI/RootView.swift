@@ -167,9 +167,17 @@ struct PanelBackground: View {
                     shape.fill(RadialGradient(colors: [Theme.accent.opacity(0.22), .clear], center: .init(x: 0.12, y: 0.25), startRadius: 0, endRadius: 440))
                     shape.fill(RadialGradient(colors: [Color(red: 0.35, green: 0.45, blue: 1).opacity(0.16), .clear], center: .init(x: 0.95, y: 1), startRadius: 0, endRadius: 420))
                     shape.stroke(Color.white.opacity(0.12), lineWidth: 1)
-                    LinearGradient(stops: [.init(color: .black, location: 0), .init(color: .black, location: 0.7), .init(color: .black.opacity(0), location: 1)],
-                                   startPoint: .top, endPoint: .bottom)
-                        .frame(height: headerHeight + 10)
+                    // The header sits on a black hood that ends in a clean rounded edge, like the notch
+                    // flowing out, instead of a fade that runs over the content.
+                    UnevenRoundedRectangle(bottomLeadingRadius: 18, bottomTrailingRadius: 18, style: .continuous)
+                        .fill(Color.black)
+                        .overlay(alignment: .bottom) {
+                            UnevenRoundedRectangle(bottomLeadingRadius: 18, bottomTrailingRadius: 18, style: .continuous)
+                                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                                .mask(LinearGradient(colors: [.clear, .white], startPoint: .top, endPoint: .bottom))
+                        }
+                        .shadow(color: .black.opacity(0.35), radius: 10, y: 4)
+                        .frame(height: headerHeight)
                         .clipShape(shape)
                 }
                 .animation(.easeInOut(duration: 0.5), value: Theme.accent.description)
@@ -238,6 +246,8 @@ struct ExpandedView: View {
                 .padding(.bottom, 16)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
+            // Aurora: a little air between the header's hood and the content.
+            .padding(.top, model.style == .aurora ? 8 : 0)
         }
         .onDrop(of: [.fileURL], isTargeted: $dropTargeted) { providers in
             // On Tools → Compare a drop anywhere fills the empty side; elsewhere files go to the Shelf.
