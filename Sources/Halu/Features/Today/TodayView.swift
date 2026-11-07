@@ -411,13 +411,19 @@ private struct FocusTile: View {
                         .font(Theme.caption(11.5, weight: .semibold))
                 }
                 .foregroundStyle(tint)
-                HStack(alignment: .center) {
-                    BigNumber(value: pomodoro.isOn ? String(format: "%d:%02d", left / 60, left % 60) : "\(pomodoro.focusMinutes):00")
-                    Spacer(minLength: 0)
+                let time = BigNumber(value: pomodoro.isOn ? String(format: "%d:%02d", left / 60, left % 60) : "\(pomodoro.focusMinutes):00")
+                    .fixedSize()
+                let buttons = HStack(spacing: 6) {
                     PillButton(title: pomodoro.isRunning ? "Pause" : pomodoro.isOn ? "Resume" : "Start", tint: tint, action: pomodoro.toggle)
                     if pomodoro.isOn {
                         PillButton(title: "Stop", tint: tint, prominent: false, action: pomodoro.stop)
                     }
+                }
+                .fixedSize()
+                // Side by side when the tile is wide enough, buttons under the time when it's small.
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .center) { time; Spacer(minLength: 8); buttons }
+                    VStack(alignment: .leading, spacing: 8) { time; buttons }
                 }
                 if pomodoro.isOn { Bar(value: 1 - pomodoro.remaining(at: context.date), tint: tint) }
             }

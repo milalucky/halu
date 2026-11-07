@@ -47,6 +47,11 @@ enum Keychain {
 
     private static func load() -> [String: String]? {
         if let cache { return cache }
+        // Demo mode never touches the Keychain.
+        if Demo.isOn {
+            cache = [:]
+            return cache
+        }
         switch copy(service: service, account: account) {
         case .found(let data):
             cache = (try? JSONDecoder().decode([String: String].self, from: data)) ?? [:]
@@ -85,6 +90,7 @@ enum Keychain {
     }
 
     private static func save(_ all: [String: String]) -> Bool {
+        if Demo.isOn { return true }
         guard let data = try? JSONEncoder().encode(all) else { return false }
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,

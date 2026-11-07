@@ -218,3 +218,11 @@ final class CalendarStore: ObservableObject {
         return parts.url ?? url
     }
 }
+
+extension CalendarStore {
+    /// Demo mode: made-up meetings instead of EventKit.
+    func loadDemo(_ meetings: [Meeting]) {
+        access = .granted
+        self.meetings = meetings
+    }
+}

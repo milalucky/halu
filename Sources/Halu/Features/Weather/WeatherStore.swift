@@ -233,3 +233,13 @@ struct WeatherPill: View {
         }
     }
 }
+
+extension WeatherStore {
+    /// Demo mode: made-up weather instead of Open-Meteo and your location.
+    func loadDemo(place: String, now: Now, hours: [Hour], days: [Day]) {
+        self.place = place
+        self.now = now
+        self.hours = hours
+        self.days = days
+    }
+}

@@ -412,3 +412,12 @@ final class MessagesStore: ObservableObject {
         return found
     }
 }
+
+extension MessagesStore {
+    /// Demo mode: made-up messages instead of the notification database and browser tabs.
+    func loadDemo(_ messages: [IncomingMessage]) {
+        access = .granted
+        self.messages = messages
+        unseen = messages.count
+    }
+}

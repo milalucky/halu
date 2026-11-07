@@ -268,6 +268,11 @@ final class Services {
                          tab: .tasks, duration: 12, sound: "Glass"))
         }
         live.start()
+        // Demo mode: made-up data, and none of the real sources start.
+        if Demo.isOn {
+            Demo.seed(self)
+            return
+        }
         scheduleWeeklyRecap()
         claudeRequests.start()
         weather.start()

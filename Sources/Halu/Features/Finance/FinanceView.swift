@@ -169,12 +169,19 @@ private struct CategoryChips: View {
     var body: some View {
         let frequent = store.frequent(income: income)
         HStack(spacing: 4) {
-            ForEach(frequent) { category in
-                chip(category, on: category.id == selected)
+            // Scrolls sideways on a narrow panel instead of pushing the whole tab wider.
+            ScrollView(.horizontal) {
+                HStack(spacing: 4) {
+                    ForEach(frequent) { category in
+                        chip(category, on: category.id == selected)
+                    }
+                    if let selected, !frequent.contains(where: { $0.id == selected }), let category = store.book.category(selected) {
+                        chip(category, on: true)
+                    }
+                }
             }
-            if let selected, !frequent.contains(where: { $0.id == selected }), let category = store.book.category(selected) {
-                chip(category, on: true)
-            }
+            .scrollIndicators(.never)
+            .fixedSize(horizontal: false, vertical: true)
             Menu {
                 ForEach(store.choices(income: income)) { item in
                     Button("\(item.emoji)  \(item.name)") { store.draftCategory = item.id }
