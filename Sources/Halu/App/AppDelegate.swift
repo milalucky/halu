@@ -15,9 +15,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         services.openWindow = { [weak self] in self?.showWindow() }
         services.collapsePanel = { [weak self] in self?.controller?.collapseAll() }
         controller = NotchController(services: services)
+        if Demo.isOn { Demo.showBackdrop() }
         setupStatusItem()
         setupHotKeys()
         setupEditMenu()
+        // `Halu --open tab[,tab…]`: opens the panel on those tabs in turn, five seconds each, starting
+        // ten seconds after launch (used for the README screenshots).
+        let arguments = CommandLine.arguments
+        if let flag = arguments.firstIndex(of: "--open"), flag + 1 < arguments.count {
+            let tabs = arguments[flag + 1].split(separator: ",").compactMap { Tab(rawValue: String($0)) }
+            for (index, tab) in tabs.enumerated() {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 10 + Double(index) * 5) { [weak self] in
+                    self?.controller?.openOnPointerScreen(tab: tab)
+                    // Demo mode tells scripts/screenshots.sh which tab is on screen now.
+                    if Demo.isOn {
+                        try? tab.rawValue.write(to: HaluStorage.directory.appendingPathComponent("showing"), atomically: true, encoding: .utf8)
+                    }
+                }
+            }
+        }
     }
 
     /// Halu shows no menu bar, but text fields only get ⌘C/⌘V/⌘X/⌘A/⌘Z through the main menu's key equivalents.

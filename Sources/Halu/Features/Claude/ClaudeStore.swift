@@ -163,3 +163,11 @@ final class ClaudeStore: ObservableObject {
         UserDefaults.standard.set(closed, forKey: "claude.closed")
     }
 }
+
+extension ClaudeStore {
+    /// Demo mode: made-up sessions instead of the hook snapshots.
+    func loadDemo(_ rows: [ClaudeRow]) {
+        hooksInstalled = true
+        self.rows = rows
+    }
+}

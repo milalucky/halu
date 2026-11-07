@@ -254,3 +254,8 @@ final class MediaStore: ObservableObject {
         return text
     }
 }
+
+extension MediaStore {
+    /// Demo mode: a made-up track instead of Core Audio.
+    func loadDemo(_ source: MediaSource) { self.source = source }
+}

@@ -63,7 +63,7 @@ struct CalendarView: View {
     }
 
     private func summary(_ meetings: [Meeting], now: Date) -> String? {
-        let left = meetings.filter { !$0.isAllDay && $0.end > now }.count
+        let left = meetings.filter { !$0.isAllDay && !$0.isLunch && $0.end > now }.count
         return left == 0 ? nil : (left == 1 ? "1 meeting left" : "\(left) meetings left")
     }
 }

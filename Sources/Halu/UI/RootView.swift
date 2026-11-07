@@ -12,6 +12,8 @@ struct RootView: View {
     let actions: PanelActions
 
     @State private var gulp = false
+    /// Mirrors Layout.requestContentHeight so the panel redraws when the Claude card's height changes.
+    @State private var requestHeight: CGFloat = 0
 
     private var claudeWaiting: Int { model.isEnabled(.claude) ? claude.attention.count : 0 }
     private var unread: Int { model.isEnabled(.messages) ? messages.unseen : 0 }
@@ -23,13 +25,16 @@ struct RootView: View {
 
     var body: some View {
         let display = display
+        let _ = requestHeight
         let size = Layout.size(display, state.geometry)
         let radii = Layout.radii(display)
         let shape = NotchShape(topRadius: radii.top, bottomRadius: radii.bottom)
         let lifted = display == .expanded || display == .notice || display == .request
 
         ZStack(alignment: .top) {
-            PanelBackground(shape: shape, style: model.style, open: lifted, headerHeight: Layout.headerHeight(state.geometry))
+            // Notices and the Claude card stay solid black in the glass themes, so they melt into the notch.
+            PanelBackground(shape: shape, style: display != .expanded && (model.style == .aurora || model.style == .glass) ? .minimal : model.style,
+                            open: lifted, headerHeight: Layout.headerHeight(state.geometry))
                 .shadow(color: .black.opacity(lifted ? 0.55 : 0), radius: 22, y: 10)
             if lifted && model.style.glows {
                 NeonRim(shape: shape)
@@ -73,6 +78,12 @@ struct RootView: View {
         case .request:
             if let request = requests.current {
                 ClaudeRequestView(request: request, top: Layout.noticeTop(state.geometry), requests: requests)
+                    // Grows the card to fit its options instead of cutting them off.
+                    .fixedSize(horizontal: false, vertical: true)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                        Layout.requestContentHeight = height
+                        requestHeight = height
+                    }
                     .transition(.opacity.animation(.easeOut(duration: 0.2)))
             }
         case .live:
@@ -95,11 +106,16 @@ struct TabContent: View {
 
     var body: some View {
         switch model.tab {
+        case .today: TodayView(model: model, services: services)
         case .tasks: TasksView(store: services.tasks, speech: services.speech)
         case .calendar: CalendarView(store: services.calendar)
         case .claude: ClaudeView(store: services.claude)
         case .chat: ChatView(store: services.chat)
         case .finance: FinanceView(store: services.finance)
+        case .habits: HabitsView(store: services.habits)
+        case .environments: EnvironmentsView(store: services.stands, accounts: services.accounts)
+        case .shortcuts: ShortcutsView(store: services.shortcuts)
+        case .system: SystemView(monitor: services.system)
         case .weather: WeatherView(weather: services.weather)
         case .clipboard: ClipboardTab(clipboard: services.clipboard, shelf: services.shelf)
         case .translate: TranslateView(store: services.translate, speech: services.speech)
@@ -144,6 +160,27 @@ struct PanelBackground: View {
                                               startPoint: .top, endPoint: .bottom))
                     shape.fill(RadialGradient(colors: [Theme.accent.opacity(0.16), .clear], center: .bottom, startRadius: 0, endRadius: 420))
                 }
+            case .aurora:
+                // Glass lit by two soft lights: the tab's colour top-left, a cool one bottom-right.
+                ZStack(alignment: .top) {
+                    Color.clear.modifier(GlassFill(shape: shape))
+                    shape.fill(RadialGradient(colors: [Theme.accent.opacity(0.22), .clear], center: .init(x: 0.12, y: 0.25), startRadius: 0, endRadius: 440))
+                    shape.fill(RadialGradient(colors: [Color(red: 0.35, green: 0.45, blue: 1).opacity(0.16), .clear], center: .init(x: 0.95, y: 1), startRadius: 0, endRadius: 420))
+                    shape.stroke(Color.white.opacity(0.12), lineWidth: 1)
+                    // The header sits on a black hood that ends in a clean rounded edge, like the notch
+                    // flowing out, instead of a fade that runs over the content.
+                    UnevenRoundedRectangle(bottomLeadingRadius: 18, bottomTrailingRadius: 18, style: .continuous)
+                        .fill(Color.black)
+                        .overlay(alignment: .bottom) {
+                            UnevenRoundedRectangle(bottomLeadingRadius: 18, bottomTrailingRadius: 18, style: .continuous)
+                                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                                .mask(LinearGradient(colors: [.clear, .white], startPoint: .top, endPoint: .bottom))
+                        }
+                        .shadow(color: .black.opacity(0.35), radius: 10, y: 4)
+                        .frame(height: headerHeight)
+                        .clipShape(shape)
+                }
+                .animation(.easeInOut(duration: 0.5), value: Theme.accent.description)
             case .glass:
                 ZStack(alignment: .top) {
                     Color.clear.modifier(GlassFill(shape: shape))
@@ -200,7 +237,7 @@ struct ExpandedView: View {
                 .environment(\.colorScheme, .dark)
             HStack(spacing: 0) {
                 Sidebar(model: model, claude: services.claude, media: services.media, messages: services.messages, gitlab: services.gitlab)
-                Rectangle().fill(Theme.hairline).frame(width: 1).padding(.vertical, 6)
+                Rectangle().fill(model.style == .aurora ? .clear : Theme.hairline).frame(width: 1).padding(.vertical, 6)
                 TabContent(model: model, services: services)
                 .id(model.style)
                 .padding(.leading, 18)
@@ -209,6 +246,8 @@ struct ExpandedView: View {
                 .padding(.bottom, 16)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
+            // Aurora: a little air between the header's hood and the content.
+            .padding(.top, model.style == .aurora ? 8 : 0)
         }
         .onDrop(of: [.fileURL], isTargeted: $dropTargeted) { providers in
             // On Tools → Compare a drop anywhere fills the empty side; elsewhere files go to the Shelf.
@@ -326,7 +365,8 @@ struct Sidebar: View {
             ScrollView(.vertical) {
                 VStack(spacing: 1) {
                     ForEach(tabs) { tab in
-                        TabButton(tab: tab, selected: model.tab == tab, height: tabs.count > 11 ? 26 : 30,
+                        // Full-size buttons always; the list scrolls when the tabs don't fit.
+                        TabButton(tab: tab, selected: model.tab == tab, height: 34,
                                   dot: (tab == .claude && !claude.attention.isEmpty) || (tab == .messages && messages.unseen > 0)
                                       || (tab == .gitlab && gitlab.newComments > 0),
                                   selection: selection) {
@@ -342,16 +382,26 @@ struct Sidebar: View {
             }
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: tabs)
-        .padding(.top, 4)
-        .padding(.bottom, 14)
-        .frame(width: 58)
+        .padding(.top, model.style == .aurora ? 8 : 4)
+        .padding(.bottom, model.style == .aurora ? 8 : 14)
+        .background {
+            // Aurora: the tabs float in a frosted capsule.
+            if model.style == .aurora {
+                Capsule(style: .continuous)
+                    .fill(Color.white.opacity(0.07))
+                    .overlay(Capsule(style: .continuous).strokeBorder(Color.white.opacity(0.12), lineWidth: 1))
+                    .padding(.horizontal, 6)
+            }
+        }
+        .padding(.bottom, model.style == .aurora ? 12 : 0)
+        .frame(width: 64)
     }
 }
 
 struct TabButton: View {
     let tab: Tab
     let selected: Bool
-    var height: CGFloat = 30
+    var height: CGFloat = 34
     var dot = false
     let selection: Namespace.ID
     let action: () -> Void
@@ -361,7 +411,13 @@ struct TabButton: View {
     var body: some View {
         Button(action: action) {
             ZStack {
-                if selected {
+                if Style.current == .aurora {
+                    // Aurora: round buttons, the selected one solid white.
+                    Circle()
+                        .fill(selected ? Color.white.opacity(0.92) : hovering ? Color.white.opacity(0.08) : .clear)
+                        .frame(width: height, height: height)
+                        .matchedGeometryEffect(id: selected ? "tab" : "tab-\(tab.rawValue)", in: selection)
+                } else if selected {
                     let tint = Style.current.color(for: tab)
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .fill(Style.current == .minimal ? Color.white.opacity(0.12) : tint.opacity(Style.current.glows ? 0.24 : 0.18))
@@ -374,18 +430,19 @@ struct TabButton: View {
                     if tab == .claude {
                         ClaudeMark()
                             .stroke(style: StrokeStyle(lineWidth: selected ? 1.9 : 1.6, lineCap: .round))
-                            .frame(width: 15, height: 15)
+                            .frame(width: 17, height: 17)
                     } else {
                         Image(systemName: tab.icon)
-                            .font(.system(size: 14, weight: selected ? .semibold : .regular))
+                            .font(.system(size: 16, weight: selected ? .semibold : .regular))
                     }
                 }
-                .foregroundStyle(selected ? (Style.current == .minimal ? Theme.primary : Style.current.color(for: tab))
+                .foregroundStyle(Style.current == .aurora ? (selected ? Color.black.opacity(0.85) : Style.current.color(for: tab).opacity(hovering ? 0.95 : 0.6))
+                                 : selected ? (Style.current == .minimal ? Theme.primary : Style.current.color(for: tab))
                                           : Style.current == .playful ? Style.current.color(for: tab).opacity(hovering ? 0.9 : 0.55)
                                           : (hovering ? Theme.secondary : Theme.tertiary))
                 .shadow(color: selected && Style.current.glows ? Style.current.color(for: tab) : .clear, radius: 4)
             }
-            .frame(width: 38, height: height)
+            .frame(width: 42, height: height)
             .overlay(alignment: .topTrailing) {
                 if dot {
                     Circle().fill(Theme.orange).frame(width: 6, height: 6).offset(x: -6, y: 6)

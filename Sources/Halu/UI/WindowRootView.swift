@@ -29,7 +29,7 @@ struct WindowRootView: View {
 
             HStack(spacing: 0) {
                 Sidebar(model: model, claude: services.claude, media: services.media, messages: services.messages, gitlab: services.gitlab)
-                Rectangle().fill(Theme.hairline).frame(width: 1).padding(.vertical, 6)
+                Rectangle().fill(model.style == .aurora ? .clear : Theme.hairline).frame(width: 1).padding(.vertical, 6)
                 TabContent(model: model, services: services)
                     .padding(.leading, 18)
                     .padding(.trailing, 20)

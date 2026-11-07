@@ -21,9 +21,15 @@ struct Notice: Identifiable, Equatable {
     var sound: String?
 
     static func meeting(_ meeting: Meeting, _ reminder: CalendarStore.Reminder) -> Notice {
+        if reminder == .lunch {
+            return Notice(icon: "fork.knife", tint: Theme.orange, title: "Lunch time",
+                          subtitle: "Until \(Fmt.time.string(from: meeting.end)) · enjoy",
+                          action: nil, actionTitle: nil, tab: .calendar, duration: 8, sound: "Pop")
+        }
         let when: String
         let tint: Color
         switch reminder {
+        case .lunch: (when, tint) = ("Lunch", Theme.orange)
         case .soon: (when, tint) = ("Starts \(Fmt.until(meeting.start))", Theme.accent)
         case .oneMinute: (when, tint) = ("Starts in a minute", Theme.orange)
         case .started: (when, tint) = ("Starting now", Theme.green)

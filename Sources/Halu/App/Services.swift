@@ -2,17 +2,22 @@ import AppKit
 import SwiftUI
 
 enum Tab: String, CaseIterable, Identifiable {
-    case tasks, calendar, finance, claude, chat, weather, jira, gitlab, messages, clipboard, translate, tools, accounts, notes, media, settings
+    case today, tasks, calendar, habits, finance, claude, chat, weather, jira, gitlab, messages, clipboard, translate, tools, environments, shortcuts, system, accounts, notes, media, settings
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
+        case .today: "Today"
         case .tasks: "Tasks"
         case .calendar: "Calendar"
         case .claude: "Claude"
         case .chat: "Chat"
         case .finance: "Money"
+        case .habits: "Habits"
+        case .environments: "Stands"
+        case .shortcuts: "Shortcuts"
+        case .system: "System"
         case .weather: "Weather"
         case .clipboard: "Clipboard"
         case .translate: "Translate"
@@ -29,11 +34,16 @@ enum Tab: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
+        case .today: "square.grid.2x2"
         case .tasks: "checklist"
         case .calendar: "calendar"
         case .claude: "sparkle"
         case .chat: "bubble.left.circle"
         case .finance: "creditcard"
+        case .habits: "repeat.circle"
+        case .environments: "server.rack"
+        case .shortcuts: "square.stack.3d.up"
+        case .system: "gauge.with.dots.needle.33percent"
         case .weather: "cloud.sun"
         case .clipboard: "doc.on.clipboard"
         case .translate: "character.bubble"
@@ -72,9 +82,9 @@ final class AppModel: ObservableObject {
         var id: String { rawValue }
         var size: CGSize {
             switch self {
-            case .compact: CGSize(width: 680, height: 404)
-            case .comfortable: CGSize(width: 780, height: 440)
-            case .wide: CGSize(width: 880, height: 480)
+            case .compact: CGSize(width: 620, height: 380)
+            case .comfortable: CGSize(width: 700, height: 420)
+            case .wide: CGSize(width: 800, height: 460)
             }
         }
     }
@@ -114,6 +124,11 @@ final class AppModel: ObservableObject {
         disabledTabs = Set((UserDefaults.standard.stringArray(forKey: "disabledTabs") ?? []).compactMap(Tab.init(rawValue:)))
         let arranged = (UserDefaults.standard.stringArray(forKey: "tabOrder") ?? []).compactMap(Tab.init(rawValue:)).filter(Self.configurable.contains)
         order = arranged + Self.configurable.filter { !arranged.contains($0) }
+        // Today is the home tab: it goes to the top of an order arranged before it existed.
+        if !arranged.isEmpty, !arranged.contains(.today) {
+            order.removeAll { $0 == .today }
+            order.insert(.today, at: 0)
+        }
         Theme.accent = Style.current.color(for: tab)
         Layout.expandedWidth = panelSize.size.width
         Layout.contentHeight = panelSize.size.height
@@ -181,6 +196,11 @@ final class Services {
     let market = MarketStore()
     let finance = FinanceStore()
     let recordly = RecordlyBridge()
+    let habits = HabitStore()
+    let stands = EnvironmentStore()
+    let shortcuts = ShortcutsStore()
+    let system = SystemMonitor()
+    let teleprompter = Teleprompter()
     let gitlab = GitLabStore()
     /// Opens Halu as a normal window that stays open; set by the app delegate.
     var openWindow: () -> Void = {}
@@ -248,6 +268,11 @@ final class Services {
                          tab: .tasks, duration: 12, sound: "Glass"))
         }
         live.start()
+        // Demo mode: made-up data, and none of the real sources start.
+        if Demo.isOn {
+            Demo.seed(self)
+            return
+        }
         scheduleWeeklyRecap()
         claudeRequests.start()
         weather.start()

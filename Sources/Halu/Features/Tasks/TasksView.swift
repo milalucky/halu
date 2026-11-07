@@ -33,6 +33,9 @@ struct TasksView: View {
                 withAnimation(.spring(response: 0.3)) { store.add(store.draft) }
                 store.draft = ""
             }
+            // Typing "#" drops a list of tags under the field.
+            .overlay(alignment: .topLeading) { TagSuggestions(store: store).offset(y: 40) }
+            .zIndex(1)
             if !store.tags.isEmpty {
                 DraftTags(store: store)
             }
@@ -151,6 +154,69 @@ private struct TagFilterMenu: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Show tasks with one tag; new tasks get it too")
+    }
+}
+
+/// While the last word of the new task starts with "#": matching tags to click, or a new one to create.
+private struct TagSuggestions: View {
+    @ObservedObject var store: TaskStore
+
+    /// The "#tag" being typed, without the "#".
+    private var typed: String? {
+        guard !store.draft.hasSuffix(" "), let last = store.draft.split(separator: " ").last, last.hasPrefix("#") else { return nil }
+        return String(last.dropFirst())
+    }
+
+    var body: some View {
+        if let typed {
+            let matches = store.tags.filter { typed.isEmpty || $0.lowercased().hasPrefix(typed.lowercased()) }
+            let isNew = !typed.isEmpty && !store.tags.contains { $0.caseInsensitiveCompare(typed) == .orderedSame }
+            if !matches.isEmpty || isNew {
+                VStack(alignment: .leading, spacing: 1) {
+                    ForEach(matches.prefix(6), id: \.self) { tag in
+                        row(TagChip(tag: tag), tag: tag)
+                    }
+                    if isNew {
+                        row(HStack(spacing: 6) {
+                            Image(systemName: "plus").font(.system(size: 9, weight: .bold))
+                            Text("Create #\(typed)").font(Theme.caption(11.5, weight: .semibold))
+                        }.foregroundStyle(Theme.accent), tag: typed)
+                    }
+                }
+                .padding(4)
+                .frame(width: 220, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color(white: 0.12)))
+                .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.hairline))
+                .shadow(color: .black.opacity(0.4), radius: 10, y: 4)
+                .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .topLeading)))
+            }
+        }
+    }
+
+    private func row(_ label: some View, tag: String) -> some View {
+        SuggestionRow(label: AnyView(label)) {
+            // Swap the half-typed "#ta" for the full "#Tag ".
+            var words = store.draft.split(separator: " ", omittingEmptySubsequences: false).map(String.init)
+            if !words.isEmpty { words.removeLast() }
+            store.draft = (words + ["#" + tag]).joined(separator: " ") + " "
+        }
+    }
+
+    private struct SuggestionRow: View {
+        let label: AnyView
+        let action: () -> Void
+        @State private var hovering = false
+
+        var body: some View {
+            Button(action: action) {
+                label.frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 8).frame(height: 26)
+                    .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(hovering ? Theme.cardHover : .clear))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .onHover { hovering = $0 }
+        }
     }
 }
 

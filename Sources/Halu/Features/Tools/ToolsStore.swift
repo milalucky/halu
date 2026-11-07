@@ -4,7 +4,7 @@ import AppKit
 @MainActor
 final class ToolsStore: ObservableObject {
     enum Mode: String, CaseIterable, Identifiable {
-        case generate = "Test data", convert = "Decode", compare = "Compare", calculator = "Calculator", converter = "Converter", emoji = "Emoji", stocks = "Stocks"
+        case generate = "Test data", convert = "Decode", compare = "Compare", calculator = "Calculator", converter = "Converter", emoji = "Emoji", stocks = "Stocks", teleprompter = "Teleprompter"
         var id: String { rawValue }
 
         var icon: String {
@@ -14,6 +14,7 @@ final class ToolsStore: ObservableObject {
             case .compare: "arrow.left.arrow.right.square"
             case .calculator: "plus.forwardslash.minus"
             case .converter: "arrow.triangle.2.circlepath"
+            case .teleprompter: "text.alignleft"
             case .emoji: "face.smiling"
             case .stocks: "chart.line.uptrend.xyaxis"
             }

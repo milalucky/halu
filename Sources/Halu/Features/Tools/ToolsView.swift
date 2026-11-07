@@ -45,6 +45,7 @@ struct ToolsView: View {
             case .compare: CompareView(store: compare)
             case .calculator: CalculatorView(market: market)
             case .converter: ConverterView(market: market)
+            case .teleprompter: TeleprompterView(prompter: Services.shared.teleprompter)
             case .emoji: EmojiView(market: market)
             case .stocks: StocksView(market: market)
             }

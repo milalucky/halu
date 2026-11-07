@@ -26,6 +26,8 @@ struct ClaudeRequestView: View {
                     .buttonStyle(.plain)
                     .font(Theme.caption(11, weight: .medium))
                     .foregroundStyle(Theme.tertiary)
+                // Closing hands the question back to Claude's own prompt, like "Answer in terminal".
+                IconButton(icon: "xmark", help: "Close; answer in the terminal", size: 10) { requests.answer(request, .terminal) }
             }
             if request.kind == .permission {
                 permission

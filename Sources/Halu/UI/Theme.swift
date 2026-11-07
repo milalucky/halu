@@ -17,6 +17,7 @@ enum Theme {
         switch Style.current {
         case .playful: accent.opacity(0.1)
         case .neon: accent.opacity(0.07)
+        case .aurora: Color.white.opacity(0.07)
         default: Color.white.opacity(0.055)
         }
     }
@@ -25,6 +26,7 @@ enum Theme {
         switch Style.current {
         case .playful: accent.opacity(0.17)
         case .neon: accent.opacity(0.13)
+        case .aurora: Color.white.opacity(0.12)
         default: Color.white.opacity(0.095)
         }
     }
@@ -112,7 +114,7 @@ struct JSONFile<Value: Codable> {
 enum HaluStorage {
     static var directory: URL {
         let url = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/Halu", isDirectory: true)
+            .appendingPathComponent(Demo.isOn ? "Library/Application Support/Halu-Demo" : "Library/Application Support/Halu", isDirectory: true)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }
