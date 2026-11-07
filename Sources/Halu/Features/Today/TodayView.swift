@@ -1,36 +1,176 @@
 import SwiftUI
 
-/// Home tab: one look at the day. Each tile is a window onto another tab's store and opens that tab;
-/// tiles of tabs turned off in Settings are left out.
+/// The tiles Today can show.
+enum TodayTile: String, CaseIterable, Codable, Identifiable {
+    case meeting, claude, tasks, focus, messages, habits, media
+    var id: String { rawValue }
+
+    /// The tab the tile comes from; it is left out while that tab is off in Settings.
+    var tab: Tab? {
+        switch self {
+        case .meeting: .calendar
+        case .claude: .claude
+        case .tasks: .tasks
+        case .messages: .messages
+        case .habits: .habits
+        case .media: .media
+        case .focus: nil
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .meeting: "Next meeting"
+        case .focus: "Focus timer"
+        default: tab?.title ?? rawValue
+        }
+    }
+
+    var icon: String { self == .focus ? "timer" : tab?.icon ?? "square" }
+}
+
+/// Which tiles Today shows, in what order and how wide; kept in UserDefaults ("today.layout").
+@MainActor
+final class TodayLayout: ObservableObject {
+    struct Slot: Codable, Equatable, Identifiable {
+        var tile: TodayTile
+        var wide: Bool
+        var shown = true
+        var id: TodayTile { tile }
+    }
+
+    static let shared = TodayLayout()
+    static let standard: [Slot] = [
+        Slot(tile: .meeting, wide: true), Slot(tile: .claude, wide: false), Slot(tile: .tasks, wide: false),
+        Slot(tile: .messages, wide: true), Slot(tile: .habits, wide: false), Slot(tile: .focus, wide: false),
+        Slot(tile: .media, wide: true),
+    ]
+
+    @Published var slots: [Slot] { didSet { save() } }
+
+    init() {
+        let saved = UserDefaults.standard.data(forKey: "today.layout").flatMap { try? JSONDecoder().decode([Slot].self, from: $0) } ?? []
+        // Tiles added in later versions join at the end.
+        slots = saved + Self.standard.filter { slot in !saved.contains { $0.tile == slot.tile } }
+    }
+
+    func move(_ slot: Slot, by step: Int) {
+        guard let index = slots.firstIndex(of: slot), slots.indices.contains(index + step) else { return }
+        slots.swapAt(index, index + step)
+    }
+
+    func reset() { slots = Self.standard }
+
+    private func save() {
+        UserDefaults.standard.set(try? JSONEncoder().encode(slots), forKey: "today.layout")
+    }
+}
+
+/// Home tab: one look at the day. Each tile is a window onto another tab's store and opens that tab.
+/// The tiles, their order and width are set with Customize.
 struct TodayView: View {
     @ObservedObject var model: AppModel
     let services: Services
+    @ObservedObject private var layout = TodayLayout.shared
+    @State private var customizing = false
 
     var body: some View {
-        GeometryReader { proxy in
-            let gap: CGFloat = 10
-            let unit = (proxy.size.width - 2 * gap) / 4
-            HStack(alignment: .top, spacing: gap) {
-                column(width: unit * 2) {
-                    if model.isEnabled(.calendar) { MeetingTile(store: services.calendar) { open(.calendar) } }
-                    if model.isEnabled(.media) { MediaTile(store: services.media) { open(.media) } }
-                    FocusTile(pomodoro: services.pomodoro)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(Fmt.dayTitle(.now) + " · " + Fmt.day.string(from: .now))
+                    .font(Theme.title(14)).foregroundStyle(Theme.primary)
+                Spacer()
+                if customizing {
+                    PillButton(title: "Reset", prominent: false) { layout.reset() }
+                    PillButton(title: "Done") { customizing = false }
+                } else {
+                    IconButton(icon: "slider.horizontal.3", help: "Customize Today") { customizing = true }
                 }
-                column(width: unit) {
-                    if model.isEnabled(.claude) { ClaudeTile(store: services.claude) { open(.claude) } }
-                    if model.isEnabled(.messages) { MessagesTile(store: services.messages) { open(.messages) } }
-                }
-                column(width: unit) {
-                    if model.isEnabled(.tasks) { TasksTile(store: services.tasks) { open(.tasks) } }
-                    if model.isEnabled(.habits) { HabitsTile(store: services.habits) { open(.habits) } }
+            }
+            if customizing {
+                editor
+            } else {
+                GeometryReader { proxy in
+                    ScrollView(.vertical) {
+                        VStack(spacing: 10) {
+                            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                                let units = row.reduce(0) { $0 + ($1.wide ? 2 : 1) }
+                                let unit = (proxy.size.width - CGFloat(row.count - 1) * 10) / CGFloat(units)
+                                HStack(alignment: .top, spacing: 10) {
+                                    ForEach(row) { slot in
+                                        tile(slot.tile).frame(width: unit * (slot.wide ? 2 : 1))
+                                    }
+                                }
+                                .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                    .scrollIndicators(.never)
                 }
             }
         }
-        .padding(.top, 2)
     }
 
-    private func column<Content: View>(width: CGFloat, @ViewBuilder _ content: () -> Content) -> some View {
-        VStack(spacing: 10, content: content).frame(width: width).frame(maxHeight: .infinity, alignment: .top)
+    /// Shown tiles packed into rows four units wide (a wide tile takes two); a short row stretches.
+    private var rows: [[TodayLayout.Slot]] {
+        var rows: [[TodayLayout.Slot]] = [], row: [TodayLayout.Slot] = [], used = 0
+        for slot in layout.slots where slot.shown && (slot.tile.tab.map(model.isEnabled) ?? true) {
+            let width = slot.wide ? 2 : 1
+            if used + width > 4 { rows.append(row); row = []; used = 0 }
+            row.append(slot)
+            used += width
+        }
+        if !row.isEmpty { rows.append(row) }
+        return rows
+    }
+
+    @ViewBuilder
+    private func tile(_ tile: TodayTile) -> some View {
+        switch tile {
+        case .meeting: MeetingTile(store: services.calendar) { open(.calendar) }
+        case .claude: ClaudeTile(store: services.claude) { open(.claude) }
+        case .tasks: TasksTile(store: services.tasks) { open(.tasks) }
+        case .messages: MessagesTile(store: services.messages) { open(.messages) }
+        case .habits: HabitsTile(store: services.habits) { open(.habits) }
+        case .media: MediaTile(store: services.media) { open(.media) }
+        case .focus: FocusTile(pomodoro: services.pomodoro)
+        }
+    }
+
+    private var editor: some View {
+        ScrollView(.vertical) {
+            VStack(spacing: 4) {
+                ForEach(layout.slots) { slot in
+                    let index = layout.slots.firstIndex(of: slot) ?? 0
+                    let off = slot.tile.tab.map { !model.isEnabled($0) } ?? false
+                    HStack(spacing: 10) {
+                        Toggle("", isOn: Binding(get: { slot.shown }, set: { layout.slots[index].shown = $0 }))
+                            .toggleStyle(.checkbox).labelsHidden()
+                        Image(systemName: slot.tile.icon).font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Style.current.color(for: slot.tile.tab ?? .habits))
+                            .frame(width: 18)
+                        Text(slot.tile.title).font(Theme.body(13)).foregroundStyle(slot.shown ? Theme.primary : Theme.tertiary)
+                        if off {
+                            Text("tab is off").font(Theme.caption(11, weight: .regular)).foregroundStyle(Theme.tertiary)
+                        }
+                        Spacer()
+                        Picker("", selection: Binding(get: { slot.wide }, set: { layout.slots[index].wide = $0 })) {
+                            Text("Small").tag(false)
+                            Text("Wide").tag(true)
+                        }
+                        .pickerStyle(.segmented).labelsHidden().frame(width: 120)
+                        IconButton(icon: "chevron.up", help: "Move up") { layout.move(slot, by: -1) }
+                            .opacity(index == 0 ? 0.3 : 1)
+                        IconButton(icon: "chevron.down", help: "Move down") { layout.move(slot, by: 1) }
+                            .opacity(index == layout.slots.count - 1 ? 0.3 : 1)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.card))
+                }
+            }
+        }
+        .scrollIndicators(.never)
     }
 
     private func open(_ tab: Tab) {
@@ -73,7 +213,7 @@ private struct Tile<Content: View>: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: 92, maxHeight: .infinity, alignment: .topLeading)
         .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(tint.opacity(hovering ? 0.15 : 0.11)))
         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(tint.opacity(0.2), lineWidth: 1))
         .onHover { hovering = $0 }
@@ -140,7 +280,6 @@ private struct MeetingTile: View {
                 }
             }
         }
-        .frame(height: 96)
     }
 }
 
@@ -174,7 +313,6 @@ private struct MediaTile: View {
                 Text("Nothing playing").font(Theme.body(13)).foregroundStyle(Theme.secondary)
             }
         }
-        .frame(height: 84)
     }
 }
 
@@ -204,7 +342,7 @@ private struct FocusTile: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 92, maxHeight: .infinity, alignment: .topLeading)
             .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(tint.opacity(0.11)))
             .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(tint.opacity(0.2), lineWidth: 1))
         }
@@ -291,7 +429,6 @@ private struct MessagesTile: View {
                 .buttonStyle(.plain)
             }
         }
-        .frame(height: 100)
     }
 }
 
@@ -319,6 +456,5 @@ private struct HabitsTile: View {
                 }
             }
         }
-        .frame(height: 100)
     }
 }

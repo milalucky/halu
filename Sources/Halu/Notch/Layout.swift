@@ -14,6 +14,9 @@ enum Layout {
     static var expandedWidth: CGFloat = 680
     static var contentHeight: CGFloat = 404
     static let noticeWidth: CGFloat = 440
+    /// The Claude card's measured content height (a question with several described options needs more
+    /// than the default); RootView keeps it current.
+    static var requestContentHeight: CGFloat = 0
     /// The concave flare at the top corners; the body of the shape is inset by it.
     static let flare: CGFloat = 8
     /// Width of each side of the collapsed notch when it carries indicators.
@@ -52,7 +55,7 @@ enum Layout {
         case .notice:
             return CGSize(width: noticeWidth, height: noticeTop(g) + 70)
         case .request:
-            return CGSize(width: 540, height: noticeTop(g) + 176)
+            return CGSize(width: 540, height: min(windowSize.height - 40, max(noticeTop(g) + 176, requestContentHeight)))
         case .expanded:
             return CGSize(width: expandedWidth, height: headerHeight(g) + contentHeight)
         }

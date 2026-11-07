@@ -12,6 +12,8 @@ struct RootView: View {
     let actions: PanelActions
 
     @State private var gulp = false
+    /// Mirrors Layout.requestContentHeight so the panel redraws when the Claude card's height changes.
+    @State private var requestHeight: CGFloat = 0
 
     private var claudeWaiting: Int { model.isEnabled(.claude) ? claude.attention.count : 0 }
     private var unread: Int { model.isEnabled(.messages) ? messages.unseen : 0 }
@@ -23,6 +25,7 @@ struct RootView: View {
 
     var body: some View {
         let display = display
+        let _ = requestHeight
         let size = Layout.size(display, state.geometry)
         let radii = Layout.radii(display)
         let shape = NotchShape(topRadius: radii.top, bottomRadius: radii.bottom)
@@ -73,6 +76,12 @@ struct RootView: View {
         case .request:
             if let request = requests.current {
                 ClaudeRequestView(request: request, top: Layout.noticeTop(state.geometry), requests: requests)
+                    // Grows the card to fit its options instead of cutting them off.
+                    .fixedSize(horizontal: false, vertical: true)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                        Layout.requestContentHeight = height
+                        requestHeight = height
+                    }
                     .transition(.opacity.animation(.easeOut(duration: 0.2)))
             }
         case .live:
