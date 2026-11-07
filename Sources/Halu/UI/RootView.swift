@@ -355,7 +355,8 @@ struct Sidebar: View {
             ScrollView(.vertical) {
                 VStack(spacing: 1) {
                     ForEach(tabs) { tab in
-                        TabButton(tab: tab, selected: model.tab == tab, height: tabs.count > 11 ? 26 : 30,
+                        // Full-size buttons always; the list scrolls when the tabs don't fit.
+                        TabButton(tab: tab, selected: model.tab == tab, height: 34,
                                   dot: (tab == .claude && !claude.attention.isEmpty) || (tab == .messages && messages.unseen > 0)
                                       || (tab == .gitlab && gitlab.newComments > 0),
                                   selection: selection) {
@@ -383,14 +384,14 @@ struct Sidebar: View {
             }
         }
         .padding(.bottom, model.style == .aurora ? 12 : 0)
-        .frame(width: 58)
+        .frame(width: 64)
     }
 }
 
 struct TabButton: View {
     let tab: Tab
     let selected: Bool
-    var height: CGFloat = 30
+    var height: CGFloat = 34
     var dot = false
     let selection: Namespace.ID
     let action: () -> Void
@@ -404,7 +405,7 @@ struct TabButton: View {
                     // Aurora: round buttons, the selected one solid white.
                     Circle()
                         .fill(selected ? Color.white.opacity(0.92) : hovering ? Color.white.opacity(0.08) : .clear)
-                        .frame(width: min(30, height + 2), height: min(30, height + 2))
+                        .frame(width: height, height: height)
                         .matchedGeometryEffect(id: selected ? "tab" : "tab-\(tab.rawValue)", in: selection)
                 } else if selected {
                     let tint = Style.current.color(for: tab)
@@ -419,10 +420,10 @@ struct TabButton: View {
                     if tab == .claude {
                         ClaudeMark()
                             .stroke(style: StrokeStyle(lineWidth: selected ? 1.9 : 1.6, lineCap: .round))
-                            .frame(width: 15, height: 15)
+                            .frame(width: 17, height: 17)
                     } else {
                         Image(systemName: tab.icon)
-                            .font(.system(size: 14, weight: selected ? .semibold : .regular))
+                            .font(.system(size: 16, weight: selected ? .semibold : .regular))
                     }
                 }
                 .foregroundStyle(Style.current == .aurora ? (selected ? Color.black.opacity(0.85) : Style.current.color(for: tab).opacity(hovering ? 0.95 : 0.6))
@@ -431,7 +432,7 @@ struct TabButton: View {
                                           : (hovering ? Theme.secondary : Theme.tertiary))
                 .shadow(color: selected && Style.current.glows ? Style.current.color(for: tab) : .clear, radius: 4)
             }
-            .frame(width: 38, height: height)
+            .frame(width: 42, height: height)
             .overlay(alignment: .topTrailing) {
                 if dot {
                     Circle().fill(Theme.orange).frame(width: 6, height: 6).offset(x: -6, y: 6)

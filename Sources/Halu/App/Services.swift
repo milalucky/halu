@@ -82,9 +82,9 @@ final class AppModel: ObservableObject {
         var id: String { rawValue }
         var size: CGSize {
             switch self {
-            case .compact: CGSize(width: 680, height: 404)
-            case .comfortable: CGSize(width: 780, height: 440)
-            case .wide: CGSize(width: 880, height: 480)
+            case .compact: CGSize(width: 620, height: 380)
+            case .comfortable: CGSize(width: 700, height: 420)
+            case .wide: CGSize(width: 800, height: 460)
             }
         }
     }

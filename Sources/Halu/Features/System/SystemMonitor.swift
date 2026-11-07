@@ -131,6 +131,8 @@ struct SystemView: View {
                           tint: battery.level <= 20 && !battery.charging ? Theme.red : Theme.green, history: nil)
                 }
             }
+            // Cards share the tallest one's height (the processor's carries a history line).
+            .fixedSize(horizontal: false, vertical: true)
             SmallCaps("Busiest right now")
             VStack(spacing: 2) {
                 ForEach(monitor.top) { process in
@@ -191,8 +193,8 @@ private struct Gauge: View {
                 .frame(width: 100, height: 18)
             }
         }
-        .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .glass(RoundedRectangle(cornerRadius: 14, style: .continuous), tint: tint.opacity(0.25))
     }
 }
